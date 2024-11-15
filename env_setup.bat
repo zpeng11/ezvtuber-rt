@@ -1,3 +1,4 @@
-conda install conda-forge::pycuda 
+conda install conda-forge::pycuda onnx onnxruntime tqdm 
 python -m pip install --upgrade pip wheel
-pip install onnx onnxruntime tqdm nvidia-cudnn-cu12 tensorrt-cu12
+python -m pip install nvidia-cudnn-cu12
+pip install tensorrt_cu12_libs==10.6.0 tensorrt_cu12_bindings==10.6.0 tensorrt==10.6.0 --extra-index-url https://pypi.nvidia.com
