@@ -209,7 +209,7 @@ def THAWithRifePerf():
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45).astype(np.float16))
 
-def THATestShow():
+def THATestShow(): #include test for face param in the future
     core = THACoreSimple('./data/tha3/seperable/fp16')
     core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
     pose = np.zeros((1,45)).astype(np.float16)
@@ -247,21 +247,33 @@ def THATestShow():
         numpy_to_image_file(ret, f'./test/data/tha/base_standard_fp16_{i}.png')
 
 def RIFETestShow():
-    img_0 = img_file_to_numpy('./test/rife/data/0.png')
-    img_1 = img_file_to_numpy('./test/rife/data/1.png')
+    img_0 = img_file_to_numpy('./test/data/rife/0.png')
+    img_1 = img_file_to_numpy('./test/data/rife/1.png')
+    os.makedirs('./test/data/rife/x2', exist_ok=True)
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2')
+    core.run(img_0, img_1)
+    res = core.run(img_0, img_1)
+    for i in range(len(res)):
+        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x2/0_{i}.png')
+
+    os.makedirs('./test/data/rife/x3', exist_ok=True)
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3')
+    core.run(img_0, img_1)
+    res = core.run(img_0, img_1)
+    for i in range(len(res)):
+        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x3/0_{i}.png')
+
+    os.makedirs('./test/data/rife/x4', exist_ok=True)
     core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4')
     core.run(img_0, img_1)
     res = core.run(img_0, img_1)
-    numpy_to_image_file(res[0]*2 -1, './test/data/0_25.png')
-    numpy_to_image_file(res[1]*2 -1, './test/data/0_50.png')
-    numpy_to_image_file(res[2]*2 -1, './test/data/0_75.png')
-    numpy_to_image_file(res[3]*2 -1, './test/data/0_80.png')
-    numpy_to_image_file(res[4]*2 -1, './test/data/0_90.png')
+    for i in range(len(res)):
+        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x4/0_{i}.png')
 
 
 if __name__ == "__main__":
     # THAWithRifePerf()
-    # THATestPerf()
+    THATestPerf()
     RIFETestPerf()
-    # THATestShow()
-    # RIFETestShow()
+    THATestShow()
+    RIFETestShow()
