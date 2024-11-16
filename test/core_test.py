@@ -64,15 +64,17 @@ class RIFECoreSimple(RIFECore):
 
     def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]: # Run new and return last result at the same time
 
+        self.outstream.wait_for_event(self.finishedExec)
+        for i in range(self.scale -1):
+            self.memories['framegen_'+str(i)].dtoh(self.outstream)
+        self.finishedFetchRes.record(self.outstream)
+
         np.copyto(self.memories['old_frame'].host, old_frame)
         self.memories['old_frame'].htod(self.instream)
         np.copyto(self.memories['latest_frame'].host, latest_frame)
         self.memories['latest_frame'].htod(self.instream)
 
-        self.outstream.wait_for_event(self.finishedExec)
-        for i in range(self.scale -1):
-            self.memories['framegen_'+str(i)].dtoh(self.outstream)
-        self.finishedFetchRes.record(self.outstream)
+        
 
         self.instream.wait_for_event(self.finishedFetchRes)
         self.engine.exec(self.instream)
@@ -111,20 +113,21 @@ class THAWithRIFE():
 
     def inference(self, pose:np.ndarray) -> List[np.ndarray]: # Put input and get last output
 
-        np.copyto(self.tha.memories['eyebrow_pose'].host, pose[:, :12])
-        self.tha.memories['eyebrow_pose'].htod(self.instream)
-        np.copyto(self.tha.memories['face_pose'].host, pose[:,12:12+27])
-        self.tha.memories['face_pose'].htod(self.instream)
-        np.copyto(self.memories['rotation_pose'].host, pose[:,12+27:])
-        self.tha.memories['rotation_pose'].htod(self.instream)
-        # self.instream.wait_for_event(self.thaFinished)
-
         self.outstream.wait_for_event(self.rifeFinished)
         for i in range(self.rife.scale -1):
             self.rife.memories['framegen_'+str(i)].dtoh(self.outstream)
 
-        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_img'].device, self.outstream)
+        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_img'].device, 
+                               self.rife.memories['old_frame'].host.nbytes, self.outstream)
         self.resultFetchFinished.record(self.outstream)
+
+        np.copyto(self.tha.memories['eyebrow_pose'].host, pose[:, :12])
+        self.tha.memories['eyebrow_pose'].htod(self.instream)
+        np.copyto(self.tha.memories['face_pose'].host, pose[:,12:12+27])
+        self.tha.memories['face_pose'].htod(self.instream)
+        np.copyto(self.tha.memories['rotation_pose'].host, pose[:,12+27:])
+        self.tha.memories['rotation_pose'].htod(self.instream)
+        # self.instream.wait_for_event(self.thaFinished)
 
         self.tha.combiner.exec(self.instream)
         self.tha.morpher.exec(self.instream)
@@ -202,6 +205,14 @@ def RIFETestPerf():
         ret = core.run(img1, img2)
     cuda.stop_profiler()
 
+def thaWithRifePerf():
+    core = THAWithRIFE('./data/tha3/standard/fp32', './data/rife_lite_v4_25/rife_x3', 'rife_512')
+    core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
+    for i in tqdm(range(1000)):
+        core.inference(np.random.rand(1,45).astype(np.float16))
+
+
 if __name__ == "__main__":
-    THATestPerf()
-    RIFETestPerf()
+    thaWithRifePerf()
+    # THATestPerf()
+    # RIFETestPerf()
