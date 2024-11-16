@@ -8,6 +8,7 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from typing import List, Tuple
 from tqdm import tqdm
+from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy
 
 class THACoreSimple(THACore):
     def __init__(self, model_dir):
@@ -64,24 +65,30 @@ class RIFECoreSimple(RIFECore):
 
     def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]: # Run new and return last result at the same time
 
-        self.outstream.wait_for_event(self.finishedExec)
-        for i in range(self.scale -1):
-            self.memories['framegen_'+str(i)].dtoh(self.outstream)
-        self.finishedFetchRes.record(self.outstream)
+        # self.outstream.wait_for_event(self.finishedExec)
+        
+        # self.finishedFetchRes.record(self.outstream)
 
         np.copyto(self.memories['old_frame'].host, old_frame)
         self.memories['old_frame'].htod(self.instream)
         np.copyto(self.memories['latest_frame'].host, latest_frame)
         self.memories['latest_frame'].htod(self.instream)
-
+        
         
 
-        self.instream.wait_for_event(self.finishedFetchRes)
+        # self.instream.wait_for_event(self.finishedFetchRes)
         self.engine.exec(self.instream)
     
-        self.finishedExec.record(self.instream)
+        # self.finishedExec.record(self.instream)
 
-        self.finishedFetchRes.synchronize()
+        # self.finishedFetchRes.synchronize()
+
+
+        for i in range(self.scale -1):
+            self.memories['framegen_'+str(i)].dtoh(self.instream)
+
+        self.instream.synchronize()
+
         ret = []
         for i in range(self.scale -1):
             ret.append(self.memories['framegen_'+str(i)].host)
@@ -206,13 +213,35 @@ def RIFETestPerf():
     cuda.stop_profiler()
 
 def thaWithRifePerf():
-    core = THAWithRIFE('./data/tha3/standard/fp32', './data/rife_lite_v4_25/rife_x3', 'rife_512')
+    core = THAWithRIFE('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/rife_x4', 'rife_384')
     core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45).astype(np.float16))
 
+def thaTestShow():
+    core = THACoreSimple('./data/tha3/standard/fp32')
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    pose = np.zeros((1,45)).astype(np.float32)
+    pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
+    ret = core.inference(pose)
+    numpy_to_image_file(ret, './test/data/base_0.png')
+
+def rifeTestShow():
+    img_0 = img_file_to_numpy('./test/data/1.png')
+    img_1 = img_file_to_numpy('./test/data/2.png')
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x6', 'rife_512')
+    core.run(img_0, img_1)
+    res = core.run(img_0, img_1)
+    numpy_to_image_file(res[0]*2 -1, './test/data/1_2.png')
+    numpy_to_image_file(res[1]*2 -1, './test/data/1_4.png')
+    numpy_to_image_file(res[2]*2 -1, './test/data/1_6.png')
+    numpy_to_image_file(res[3]*2 -1, './test/data/1_8.png')
+    numpy_to_image_file(res[5]*2 -1, './test/data/1_9.png')
+
 
 if __name__ == "__main__":
-    thaWithRifePerf()
+    # thaWithRifePerf()
     # THATestPerf()
     # RIFETestPerf()
+    # thaTestShow()
+    rifeTestShow()

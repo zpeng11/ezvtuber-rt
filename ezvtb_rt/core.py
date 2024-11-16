@@ -28,6 +28,7 @@ class Engine:
         TRT_LOGGER.log(TRT_LOGGER.WARNING, f'Loading engine from file {join(model_dir, model_component)}')
         dtype = 'fp32' if 'fp32' in model_dir else 'fp16'
         self.engine = get_trt_engine(model_dir, model_component, dtype)
+        assert(self.engine is not None)
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Completed loading engine')
 
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating inference context')
@@ -139,6 +140,10 @@ class RIFECore:
                 self.scale = 3
             elif 'x4' in model_dir:
                 self.scale = 4
+            elif 'x5' in model_dir:
+                self.scale = 5
+            elif 'x6' in model_dir:
+                self.scale = 6
             else:
                 raise ValueError('can not determine scale')
         else:
