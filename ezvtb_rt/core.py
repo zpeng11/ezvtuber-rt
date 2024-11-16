@@ -68,7 +68,7 @@ class Engine:
     def exec(self, stream):
         self.context.execute_async_v3(stream.handle)
 
-class THACore(ABC):
+class THACore:
     def __init__(self, model_dir):
         self.prepareEngines(model_dir)
         self.prepareMemories()
@@ -130,7 +130,7 @@ class THACore(ABC):
         editor_outputs = [self.memories['output_img']]
         self.editor.setOutputMems(editor_outputs)
 
-class RIFECore(ABC):
+class RIFECore:
     def __init__(self, model_dir:str, model_component:str, scale:int = -1, latest_frame:HostDeviceMem = None):
         if scale < 2:
             if 'x2' in model_dir:
