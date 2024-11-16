@@ -132,7 +132,7 @@ class THACore:
         self.editor.setOutputMems(editor_outputs)
 
 class RIFECore:
-    def __init__(self, model_dir:str, model_component:str, scale:int = -1, latest_frame:HostDeviceMem = None):
+    def __init__(self, model_dir:str, scale:int = -1, latest_frame:HostDeviceMem = None):
         if scale < 2:
             if 'x2' in model_dir:
                 self.scale = 2
@@ -140,22 +140,18 @@ class RIFECore:
                 self.scale = 3
             elif 'x4' in model_dir:
                 self.scale = 4
-            elif 'x5' in model_dir:
-                self.scale = 5
-            elif 'x6' in model_dir:
-                self.scale = 6
             else:
                 raise ValueError('can not determine scale')
         else:
             self.scale = scale
         TRT_LOGGER.log(TRT_LOGGER.INFO, f'RIFE scale {self.scale}')
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating RIFE engine')
-        self.prepareEngines(model_dir, model_component)
+        self.prepareEngines(model_dir)
         self.prepareMemories(latest_frame)
         self.setMemsToEngines()
 
-    def prepareEngines(self, model_dir:str, model_component:str, engineT = Engine): #inherit and pass different engine type
-        self.engine = engineT(model_dir, model_component, 2)
+    def prepareEngines(self, model_dir:str, engineT = Engine): #inherit and pass different engine type
+        self.engine = engineT(model_dir, 'rife_512', 2)
     def prepareMemories(self, latest_frame:HostDeviceMem): 
         self.memories = {}
         self.memories['old_frame'] = createMemory(self.engine.inputs[0])

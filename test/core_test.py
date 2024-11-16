@@ -53,8 +53,8 @@ class THACoreSimple(THACore):
         return self.memories['output_img'].host
     
 class RIFECoreSimple(RIFECore):
-    def __init__(self, model_dir, model_component):
-        super().__init__(model_dir, model_component)
+    def __init__(self, model_dir):
+        super().__init__(model_dir)
         # create stream
         self.instream = cuda.Stream()
         self.outstream = cuda.Stream()
@@ -95,9 +95,9 @@ class RIFECoreSimple(RIFECore):
         return ret
 
 class THAWithRIFE():
-    def __init__(self, tha_model_dir, rift_model_dir, rift_component):
+    def __init__(self, tha_model_dir, rift_model_dir):
         self.tha = THACore(tha_model_dir)
-        self.rife = RIFECore(rift_model_dir, rift_component,scale = -1, latest_frame=self.tha.memories['output_img'])
+        self.rife = RIFECore(rift_model_dir, scale = -1, latest_frame=self.tha.memories['output_img'])
         
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
@@ -162,6 +162,7 @@ class THAWithRIFE():
 
 def THATestPerf():
     core = THACoreSimple('./data/tha3/seperable/fp16')
+    cuda.start_profiler()
     core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
     for i in tqdm(range(1000)):
         ret = core.inference(np.random.rand(1, 45).astype(np.float16))
@@ -180,68 +181,87 @@ def THATestPerf():
     core.setImage(np.random.rand(1,4,512,512).astype(np.float32))
     for i in tqdm(range(1000)):
         ret = core.inference(np.random.rand(1, 45).astype(np.float32))
+    cuda.stop_profiler()
 
 
 def RIFETestPerf():
     
-    img1 = np.random.rand(1,3,512,512).astype(np.float16)
-    img2 = np.random.rand(1,3,512,512).astype(np.float16)
+    img1 = np.random.rand(1,4,512,512).astype(np.float16)
+    img2 = np.random.rand(1,4,512,512).astype(np.float16)
     cuda.start_profiler()
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2', 'rife_512')
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2', 'rife_384')
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3', 'rife_512')
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3', 'rife_384')
-    for i in tqdm(range(1000)):
-        ret = core.run(img1, img2)
-
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4', 'rife_512')
-    for i in tqdm(range(1000)):
-        ret = core.run(img1, img2)
-
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4', 'rife_384')
-    for i in tqdm(range(1000)):
-        ret = core.run(img1, img2)
     cuda.stop_profiler()
 
-def thaWithRifePerf():
-    core = THAWithRIFE('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/rife_x4', 'rife_384')
+def THAWithRifePerf():
+    core = THAWithRIFE('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/rife_x4', 'rife_512')
     core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45).astype(np.float16))
 
-def thaTestShow():
-    core = THACoreSimple('./data/tha3/standard/fp32')
-    core.setImage( img_file_to_numpy('./test/data/base.png'))
-    pose = np.zeros((1,45)).astype(np.float32)
-    pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
-    ret = core.inference(pose)
-    numpy_to_image_file(ret, './test/data/base_0.png')
+def THATestShow():
+    core = THACoreSimple('./data/tha3/seperable/fp16')
+    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
+    pose = np.zeros((1,45)).astype(np.float16)
+    for i in range(10):
+        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
+        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
+        ret = core.inference(pose)
+        numpy_to_image_file(ret, f'./test/data/tha/base_seperable_fp16_{i}.png')
+    
+    core = THACoreSimple('./data/tha3/seperable/fp32')
+    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
+    pose = np.zeros((1,45)).astype(np.float16)
+    for i in range(10):
+        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
+        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
+        ret = core.inference(pose)
+        numpy_to_image_file(ret, f'./test/data/tha/base_seperable_fp32_{i}.png')
 
-def rifeTestShow():
-    img_0 = img_file_to_numpy('./test/data/1.png')
-    img_1 = img_file_to_numpy('./test/data/2.png')
-    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x6', 'rife_512')
+    core = THACoreSimple('./data/tha3/standard/fp32')
+    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
+    pose = np.zeros((1,45)).astype(np.float16)
+    for i in range(10):
+        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
+        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
+        ret = core.inference(pose)
+        numpy_to_image_file(ret, f'./test/data/tha/base_standard_fp32_{i}.png')
+
+    core = THACoreSimple('./data/tha3/standard/fp16')
+    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
+    pose = np.zeros((1,45)).astype(np.float16)
+    for i in range(10):
+        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
+        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
+        ret = core.inference(pose)
+        numpy_to_image_file(ret, f'./test/data/tha/base_standard_fp16_{i}.png')
+
+def RIFETestShow():
+    img_0 = img_file_to_numpy('./test/rife/data/0.png')
+    img_1 = img_file_to_numpy('./test/rife/data/1.png')
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4')
     core.run(img_0, img_1)
     res = core.run(img_0, img_1)
-    numpy_to_image_file(res[0]*2 -1, './test/data/1_2.png')
-    numpy_to_image_file(res[1]*2 -1, './test/data/1_4.png')
-    numpy_to_image_file(res[2]*2 -1, './test/data/1_6.png')
-    numpy_to_image_file(res[3]*2 -1, './test/data/1_8.png')
-    numpy_to_image_file(res[5]*2 -1, './test/data/1_9.png')
+    numpy_to_image_file(res[0]*2 -1, './test/data/0_25.png')
+    numpy_to_image_file(res[1]*2 -1, './test/data/0_50.png')
+    numpy_to_image_file(res[2]*2 -1, './test/data/0_75.png')
+    numpy_to_image_file(res[3]*2 -1, './test/data/0_80.png')
+    numpy_to_image_file(res[4]*2 -1, './test/data/0_90.png')
 
 
 if __name__ == "__main__":
-    # thaWithRifePerf()
+    # THAWithRifePerf()
     # THATestPerf()
-    # RIFETestPerf()
-    # thaTestShow()
-    rifeTestShow()
+    RIFETestPerf()
+    # THATestShow()
+    # RIFETestShow()

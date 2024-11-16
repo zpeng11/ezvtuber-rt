@@ -16,7 +16,7 @@ Nvidia Turing microarchitecture graphic cards only. Any gaming card higher than 
 ### Static Models
 Made static ONNX format model from THA3 and RIFE's prior dynamic PyTorch implementations, which allows graph level optimization and solid inference framework support. Removed dependency from PyTorch.
 
-深度拆解 THA3 和 RIFE 模型并完成ONNX静态化。允许图优化及推理框架使用。去除 Pytorch 拥有更简单环境依赖。
+深度拆解 THA3 和 RIFE 模型并完成ONNX静态化。允许图优化及推理框架使用。去除 Pytorch 拥有更简单环境依赖和更快启动时间。
 
 ### TensrRT
 Powered by Nvidia TensorRT which unlocks the full computation potential of the GPU and acelerates using FP16, BF16, and TF32.
@@ -24,9 +24,9 @@ Powered by Nvidia TensorRT which unlocks the full computation potential of the G
 使用TenosorRT框架进行推理，可使用多种精度进行加速。
 
 ### RIFE
-Introduced RIFE model to perform frame interpolation between 2 native frame comes out from THA. Resource consumption of RIFE is significantly less than THA. Just to noticed frame interpolation would bring system delay as a tradeoff. Provided up x4 times interpolation. This feature is crucial for low-end gpus like my 1660s.
+Introduced RIFE model to perform frame interpolation between 2 native frame comes out from THA. Resource consumption of RIFE is significantly less than THA. Just to noticed frame interpolation would bring system delay as a tradeoff. Provided up x4 times interpolation. This feature is crucial for low-end gpus like my 1660s. Limited by RIFE, interpolation up to x4 times, which brings 10fps native frame gen to 40fps experience.
 
-使用RIFE模型进行实时插帧，带来更高帧数更少资源消耗，作为交换引入了一定系统延迟，请自行把控。低端卡福音！
+使用RIFE模型进行实时插帧，带来更高帧数更少资源消耗，作为交换引入了一定系统延迟，请自行把控。低端卡福音！受制于RIFE模型设计，最高4倍插帧，等同于将10帧原生画面拉进40帧可用级别，即使高端卡也受益获得更低显卡占用，无需双卡双机。
 
 ## Onnx models: 
 This project made static ONNX for models in THA3 and RIFE-lite-v4.25, please download converted models from the following link. You should be noticed that these model are originally developed in THA3 and RIFE project. You can find licenses come with the model from the download.
