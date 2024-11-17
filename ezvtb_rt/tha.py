@@ -1,0 +1,113 @@
+import sys
+import os
+sys.path.append(os.getcwd())
+from ezvtb_rt.trt_utils import *
+from os.path import join
+from ezvtb_rt.engine import Engine, createMemory
+
+
+class THACore:
+    def __init__(self, model_dir):
+        self.prepareEngines(model_dir)
+        self.prepareMemories()
+        self.setMemsToEngines()
+
+    def prepareEngines(self, model_dir, engineT = Engine): #inherit and pass different engine type
+        TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating Engines')
+        self.decomposer = engineT(model_dir, 'decomposer', 1)
+        self.combiner = engineT(model_dir, 'combiner', 4)
+        self.morpher = engineT(model_dir, 'morpher', 4)
+        self.rotator = engineT(model_dir, 'rotator', 2)
+        self.editor = engineT(model_dir, 'editor', 4)
+
+    def prepareMemories(self):
+        TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating memories on VRAM')
+        self.memories = {}
+        self.memories['input_img'] = createMemory(self.decomposer.inputs[0])
+        self.memories["background_layer"] = createMemory(self.decomposer.outputs[0])
+        self.memories["eyebrow_layer"] = createMemory(self.decomposer.outputs[1])
+
+        self.memories['eyebrow_pose'] = createMemory(self.combiner.inputs[3])
+        self.memories['eyebrow_image'] = createMemory(self.combiner.outputs[0])
+        self.memories['morpher_decoded'] = createMemory(self.combiner.outputs[1])
+
+        self.memories['face_pose'] = createMemory(self.morpher.inputs[2])
+        self.memories['face_morphed_full'] = createMemory(self.morpher.outputs[0])
+        self.memories['face_morphed_half'] = createMemory(self.morpher.outputs[1])
+
+        self.memories['rotation_pose'] = createMemory(self.rotator.inputs[1])
+        self.memories['wrapped_image'] = createMemory(self.rotator.outputs[0])
+        self.memories['grid_change'] = createMemory(self.rotator.outputs[1])
+
+        self.memories['output_img'] = createMemory(self.editor.outputs[0])
+
+    def setMemsToEngines(self):
+        TRT_LOGGER.log(TRT_LOGGER.INFO, 'Linking memories on VRAM to engine graph nodes')
+        decomposer_inputs = [self.memories['input_img']]
+        self.decomposer.setInputMems(decomposer_inputs)
+        decomposer_outputs = [self.memories["background_layer"], self.memories["eyebrow_layer"]]
+        self.decomposer.setOutputMems(decomposer_outputs)
+
+        combiner_inputs = [self.memories['input_img'], self.memories["background_layer"], self.memories["eyebrow_layer"], self.memories['eyebrow_pose']]
+        self.combiner.setInputMems(combiner_inputs)
+        combiner_outputs = [self.memories['eyebrow_image'], self.memories['morpher_decoded']]
+        self.combiner.setOutputMems(combiner_outputs)
+
+        morpher_inputs = [self.memories['input_img'], self.memories['eyebrow_image'], self.memories['face_pose'], self.memories['morpher_decoded']]
+        self.morpher.setInputMems(morpher_inputs)
+        morpher_outputs = [self.memories['face_morphed_full'], self.memories['face_morphed_half']]
+        self.morpher.setOutputMems(morpher_outputs)
+
+        rotator_inputs = [self.memories['face_morphed_half'], self.memories['rotation_pose']]
+        self.rotator.setInputMems(rotator_inputs)
+        rotator_outputs = [self.memories['wrapped_image'], self.memories['grid_change']]
+        self.rotator.setOutputMems(rotator_outputs)
+
+        editor_inputs = [self.memories['face_morphed_full'], self.memories['wrapped_image'], self.memories['grid_change'], self.memories['rotation_pose']]
+        self.editor.setInputMems(editor_inputs)
+        editor_outputs = [self.memories['output_img']]
+        self.editor.setOutputMems(editor_outputs)
+
+
+class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just for benchmarking tha's performance on given platform
+    def __init__(self, model_dir):
+        super().__init__(model_dir)
+        # create stream
+        self.stream = cuda.Stream()
+        # Create a CUDA events
+        self.start_event = cuda.Event()
+        self.end_event = cuda.Event()
+    def get_last_inference_time(self):
+        return self.start_event.time_till(self.end_event)
+    
+    def setImage(self, img:np.ndarray):
+        assert(len(img.shape) == 4 and 
+               img.shape[0] == 1 and 
+               img.shape[1] == 4 and 
+               img.shape[2] == 512 and 
+               img.shape[3] == 512)
+        np.copyto(self.memories['input_img'].host, img)
+        self.memories['input_img'].htod(self.stream)
+        self.decomposer.exec(self.stream)
+        self.stream.synchronize()
+    def inference(self, pose:np.ndarray):
+        
+
+        np.copyto(self.memories['eyebrow_pose'].host, pose[:, :12])
+        self.memories['eyebrow_pose'].htod(self.stream)
+        np.copyto(self.memories['face_pose'].host, pose[:,12:12+27])
+        self.memories['face_pose'].htod(self.stream)
+        np.copyto(self.memories['rotation_pose'].host, pose[:,12+27:])
+        self.memories['rotation_pose'].htod(self.stream)
+
+        self.start_event.record(self.stream)
+        self.combiner.exec(self.stream)
+        self.morpher.exec(self.stream)
+        self.rotator.exec(self.stream)
+        self.editor.exec(self.stream)
+        self.end_event.record(self.stream)
+
+        self.memories['output_img'].dtoh(self.stream)
+        
+        self.stream.synchronize()
+        return self.memories['output_img'].host
