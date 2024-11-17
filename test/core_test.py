@@ -68,7 +68,7 @@ class RIFECoreSimple(RIFECore):
 
         self.outstream.wait_for_event(self.finishedExec)
         
-        for i in range(self.scale -1):
+        for i in range(self.scale):
             self.memories['framegen_'+str(i)].dtoh(self.outstream)
         
         self.finishedFetchRes.record(self.outstream)
@@ -88,7 +88,7 @@ class RIFECoreSimple(RIFECore):
         self.finishedFetchRes.synchronize()
 
         ret = []
-        for i in range(self.scale -1):
+        for i in range(self.scale):
             ret.append(self.memories['framegen_'+str(i)].host)
         return ret
 
@@ -255,25 +255,26 @@ def RIFETestShow():
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
     tha_res = []
+    base_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(img.copy())
-    generate_video(tha_res, './test/data/rife/base.mp4', 20)
+        base_res.append(thaimg_to_cvimg(img.copy()))
+    generate_video(base_res, './test/data/rife/base.mp4', 20)
 
     def createInterpolatedVideo(old_vid, core):
         new_vid = []
         for i in range(len(old_vid)):
             if i == 0:
                 core.run(old_vid[0], old_vid[1])
-                new_vid.append(old_vid[0])
+                new_vid.append(thaimg_to_cvimg(old_vid[0])[:,:,:3])
             elif i+1 <len(old_vid):
                 interpolates = core.run(old_vid[i], old_vid[i+1])
                 for inter in interpolates:
-                    new_vid.append(inter*2-1)
-                new_vid.append(old_vid[i])
+                    new_vid.append(inter.astype(np.uint8)[:,:,:3])
         interpolates = core.run(old_vid[0], old_vid[0])
         for inter in interpolates:
-            new_vid.append(inter*2-1)
+            new_vid.append(inter.astype(np.uint8)[:,:,:3])
         return new_vid
 
     core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2')
@@ -305,5 +306,5 @@ if __name__ == "__main__":
     # THAWithRifePerf()
     # THATestPerf()
     # RIFETestPerf()
-    THATestShow()
-    # RIFETestShow()
+    # THATestShow()
+    RIFETestShow()

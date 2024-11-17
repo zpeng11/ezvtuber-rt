@@ -151,7 +151,7 @@ class RIFECore:
         self.setMemsToEngines()
 
     def prepareEngines(self, model_dir:str, engineT = Engine): #inherit and pass different engine type
-        self.engine = engineT(model_dir, 'rife_512', 2)
+        self.engine = engineT(model_dir, 'rife', 2)
     def prepareMemories(self, latest_frame:HostDeviceMem): 
         self.memories = {}
         self.memories['old_frame'] = createMemory(self.engine.inputs[0])
@@ -159,11 +159,11 @@ class RIFECore:
             self.memories['latest_frame'] = createMemory(self.engine.inputs[1])
         else:
             self.memories['latest_frame'] = latest_frame
-        for i in range(self.scale - 1):
+        for i in range(self.scale):
             self.memories['framegen_'+str(i)] = createMemory(self.engine.outputs[i])
     def setMemsToEngines(self):
         self.engine.setInputMems([self.memories['old_frame'], self.memories['latest_frame']])
-        outputs = [self.memories['framegen_'+str(i)] for i in range(self.scale - 1)]
+        outputs = [self.memories['framegen_'+str(i)] for i in range(self.scale)]
         self.engine.setOutputMems(outputs)
 
 
