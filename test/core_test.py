@@ -8,7 +8,8 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from typing import List, Tuple
 from tqdm import tqdm
-from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy
+from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy, generate_video
+import json
 
 class THACoreSimple(THACore):
     def __init__(self, model_dir):
@@ -63,11 +64,14 @@ class RIFECoreSimple(RIFECore):
         self.finishedExec = cuda.Event()
 
 
-    def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]: # Run new and return last result at the same time
+    def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]: # Give new input and return last result at the same time
 
-        # self.outstream.wait_for_event(self.finishedExec)
+        self.outstream.wait_for_event(self.finishedExec)
         
-        # self.finishedFetchRes.record(self.outstream)
+        for i in range(self.scale -1):
+            self.memories['framegen_'+str(i)].dtoh(self.outstream)
+        
+        self.finishedFetchRes.record(self.outstream)
 
         np.copyto(self.memories['old_frame'].host, old_frame)
         self.memories['old_frame'].htod(self.instream)
@@ -76,18 +80,12 @@ class RIFECoreSimple(RIFECore):
         
         
 
-        # self.instream.wait_for_event(self.finishedFetchRes)
+        self.instream.wait_for_event(self.finishedFetchRes)
         self.engine.exec(self.instream)
     
-        # self.finishedExec.record(self.instream)
+        self.finishedExec.record(self.instream)
 
-        # self.finishedFetchRes.synchronize()
-
-
-        for i in range(self.scale -1):
-            self.memories['framegen_'+str(i)].dtoh(self.instream)
-
-        self.instream.synchronize()
+        self.finishedFetchRes.synchronize()
 
         ret = []
         for i in range(self.scale -1):
@@ -211,69 +209,101 @@ def THAWithRifePerf():
 
 def THATestShow(): #include test for face param in the future
     core = THACoreSimple('./data/tha3/seperable/fp16')
-    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
-    pose = np.zeros((1,45)).astype(np.float16)
-    for i in range(10):
-        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
-        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
-        ret = core.inference(pose)
-        numpy_to_image_file(ret, f'./test/data/tha/base_seperable_fp16_{i}.png')
-    
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45))
+        tha_res.append(img.copy())
+    generate_video(tha_res, './test/data/tha/sepe16.mp4', 20)
+
     core = THACoreSimple('./data/tha3/seperable/fp32')
-    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
-    pose = np.zeros((1,45)).astype(np.float16)
-    for i in range(10):
-        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
-        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
-        ret = core.inference(pose)
-        numpy_to_image_file(ret, f'./test/data/tha/base_seperable_fp32_{i}.png')
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45))
+        tha_res.append(img.copy())
+    generate_video(tha_res, './test/data/tha/sepe32.mp4', 20)
+    
 
     core = THACoreSimple('./data/tha3/standard/fp32')
-    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
-    pose = np.zeros((1,45)).astype(np.float16)
-    for i in range(10):
-        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
-        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
-        ret = core.inference(pose)
-        numpy_to_image_file(ret, f'./test/data/tha/base_standard_fp32_{i}.png')
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45))
+        tha_res.append(img.copy())
+    generate_video(tha_res, './test/data/tha/stand32.mp4', 20)
 
     core = THACoreSimple('./data/tha3/standard/fp16')
-    core.setImage( img_file_to_numpy('./test/data/tha/base.png'))
-    pose = np.zeros((1,45)).astype(np.float16)
-    for i in range(10):
-        pose[:,:12] = np.random.rand(1,12) * 2.0 - 1.0
-        pose[:,-6:] = np.random.rand(1,6) * 2.0 - 1.0
-        ret = core.inference(pose)
-        numpy_to_image_file(ret, f'./test/data/tha/base_standard_fp16_{i}.png')
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45))
+        tha_res.append(img.copy())
+    generate_video(tha_res, './test/data/tha/stand16.mp4', 20)
 
 def RIFETestShow():
-    img_0 = img_file_to_numpy('./test/data/rife/0.png')
-    img_1 = img_file_to_numpy('./test/data/rife/1.png')
-    os.makedirs('./test/data/rife/x2', exist_ok=True)
+    core = THACoreSimple('./data/tha3/standard/fp32')
+    core.setImage( img_file_to_numpy('./test/data/base.png'))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45))
+        tha_res.append(img.copy())
+    generate_video(tha_res, './test/data/rife/base.mp4', 20)
+
+    def createInterpolatedVideo(old_vid, core):
+        new_vid = []
+        for i in range(len(old_vid)):
+            if i == 0:
+                core.run(old_vid[0], old_vid[1])
+                new_vid.append(old_vid[0])
+            elif i+1 <len(old_vid):
+                interpolates = core.run(old_vid[i], old_vid[i+1])
+                for inter in interpolates:
+                    new_vid.append(inter*2-1)
+                new_vid.append(old_vid[i])
+        interpolates = core.run(old_vid[0], old_vid[0])
+        for inter in interpolates:
+            new_vid.append(inter*2-1)
+        return new_vid
+
     core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2')
-    core.run(img_0, img_1)
-    res = core.run(img_0, img_1)
-    for i in range(len(res)):
-        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x2/0_{i}.png')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x2.mp4', 40)
 
-    os.makedirs('./test/data/rife/x3', exist_ok=True)
     core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3')
-    core.run(img_0, img_1)
-    res = core.run(img_0, img_1)
-    for i in range(len(res)):
-        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x3/0_{i}.png')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x3.mp4', 60)
 
-    os.makedirs('./test/data/rife/x4', exist_ok=True)
     core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4')
-    core.run(img_0, img_1)
-    res = core.run(img_0, img_1)
-    for i in range(len(res)):
-        numpy_to_image_file(res[i]*2 -1, f'./test/data/rife/x4/0_{i}.png')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x4.mp4', 80)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx2.mp4', 20)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx3.mp4', 30)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx4.mp4', 40)
 
 
 if __name__ == "__main__":
     # THAWithRifePerf()
-    THATestPerf()
-    RIFETestPerf()
-    THATestShow()
+    # THATestPerf()
+    # RIFETestPerf()
+    # THATestShow()
     RIFETestShow()
