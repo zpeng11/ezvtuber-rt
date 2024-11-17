@@ -2,8 +2,7 @@ import sys
 import os
 sys.path.append(os.getcwd())
 
-from ezvtb_rt.rife import RIFECoreSimple, RIFECore
-from ezvtb_rt.tha import THACoreSimple, THACore
+from ezvtb_rt.core import Core
 import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
@@ -25,11 +24,14 @@ import json
 
 
 
-# def THAWithRifePerf():
-#     core = THAWithRIFE('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/rife_x4', 'rife_512')
-#     core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
-#     for i in tqdm(range(1000)):
-#         core.inference(np.random.rand(1,45).astype(np.float16))
+def CorePerf():
+    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/rife_x4')
+    core.setImage(np.random.rand(1,4,512,512).astype(np.float16))
+    cuda.start_profiler()
+    for i in tqdm(range(1000)):
+        core.inference(np.random.rand(1,45).astype(np.float16))
+    cuda.stop_profiler()
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
+    CorePerf()

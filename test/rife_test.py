@@ -43,6 +43,11 @@ def RIFETestShow():
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(img.copy())
         base_res.append(thaimg_to_cvimg(img.copy()))
+    tha_res = tha_res[1:]
+    base_res = base_res[1:]
+    img = core.inference(np.array(pose).reshape(1,45))
+    tha_res.append(img.copy())
+    base_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(base_res, './test/data/rife/base.mp4', 20)
     generate_video(base_res[::2], './test/data/rife/halfbase.mp4', 10)
 

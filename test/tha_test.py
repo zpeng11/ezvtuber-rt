@@ -44,6 +44,9 @@ def THATestShow(): #include test for face param in the future
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(thaimg_to_cvimg(img.copy()))
+    tha_res = tha_res[1:]
+    img = core.inference(np.array(pose).reshape(1,45))
+    tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/sepe16.mp4', 20)
 
     core = THACoreSimple('./data/tha3/seperable/fp32')
@@ -54,6 +57,9 @@ def THATestShow(): #include test for face param in the future
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(thaimg_to_cvimg(img.copy()))
+    tha_res = tha_res[1:]
+    img = core.inference(np.array(pose).reshape(1,45))
+    tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/sepe32.mp4', 20)
     
 
@@ -65,6 +71,9 @@ def THATestShow(): #include test for face param in the future
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(thaimg_to_cvimg(img.copy()))
+    tha_res = tha_res[1:]
+    img = core.inference(np.array(pose).reshape(1,45))
+    tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/stand32.mp4', 20)
 
     core = THACoreSimple('./data/tha3/standard/fp16')
@@ -75,6 +84,9 @@ def THATestShow(): #include test for face param in the future
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(thaimg_to_cvimg(img.copy()))
+    tha_res = tha_res[1:]
+    img = core.inference(np.array(pose).reshape(1,45))
+    tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/stand16.mp4', 20)
 
 

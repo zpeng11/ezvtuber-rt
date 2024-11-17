@@ -28,20 +28,22 @@ def thaimg_to_cvimg(im:np.ndarray):
     im = cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
     return im
 
-def img_file_to_numpy(path:str, dtype:str = 'fp32'):
+def img_file_to_numpy(path:str, dtype:str = 'fp32'): # Image file to tha image
     im = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if im.shape[2] == 3: #RGB format
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2BGRA)
     im = cvimg_to_thaimg(im)
     if 'fp16' in dtype:
         im = im.astype(np.float16)
     return im
 
-def numpy_to_image_file(im:np.ndarray, path:str):
+def numpy_to_image_file(im:np.ndarray, path:str): # tha image to image file
     im = thaimg_to_cvimg(im)
     cv2.imwrite(path, im)
 
 
 # Function to generate video
-def generate_video(imgs:List[np.ndarray], video_path:str, framerate:float): #Images are uint8 ndarry[512,512,3], RGB, range(0, 255)
+def generate_video(imgs:List[np.ndarray], video_path:str, framerate:float): #Images should be prepared to be opencv image layout
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video = cv2.VideoWriter(video_path, fourcc, framerate, (512, 512))

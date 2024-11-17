@@ -15,8 +15,7 @@ class Core():
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
         self.outstream = cuda.Stream()
-
-        self.thaFinished = cuda.Event()
+        
         self.rifeFinished = cuda.Event()
         self.resultFetchFinished = cuda.Event()
 
@@ -31,15 +30,16 @@ class Core():
         self.tha.decomposer.exec(self.updatestream)
         self.updatestream.synchronize()
 
-    def inference(self, pose:np.ndarray) -> List[np.ndarray]: # Put input and get last output
+    def inference(self, pose:np.ndarray) -> List[np.ndarray]: # Put input and get output of previous framegen
 
         self.outstream.wait_for_event(self.rifeFinished)
-        for i in range(self.rife.scale -1):
+        for i in range(self.rife.scale):
             self.rife.memories['framegen_'+str(i)].dtoh(self.outstream)
 
-        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_img'].device, 
-                               self.rife.memories['old_frame'].host.nbytes, self.outstream)
         self.resultFetchFinished.record(self.outstream)
+
+        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_img'].device, 
+                               self.rife.memories['old_frame'].host.nbytes, self.instream)
 
         np.copyto(self.tha.memories['eyebrow_pose'].host, pose[:, :12])
         self.tha.memories['eyebrow_pose'].htod(self.instream)
@@ -47,12 +47,10 @@ class Core():
         self.tha.memories['face_pose'].htod(self.instream)
         np.copyto(self.tha.memories['rotation_pose'].host, pose[:,12+27:])
         self.tha.memories['rotation_pose'].htod(self.instream)
-        # self.instream.wait_for_event(self.thaFinished)
 
         self.tha.combiner.exec(self.instream)
         self.tha.morpher.exec(self.instream)
         self.tha.rotator.exec(self.instream)
-        
         self.tha.editor.exec(self.instream)
 
         self.instream.wait_for_event(self.resultFetchFinished)
@@ -62,8 +60,6 @@ class Core():
         self.resultFetchFinished.synchronize()
 
         ret = []
-        for i in range(self.rife.scale -1):
+        for i in range(self.rife.scale):
             ret.append(self.rife.memories['framegen_'+str(i)].host)
-
-        ret.append(self.rife.memories['old_frame'])
         return ret

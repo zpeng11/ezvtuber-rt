@@ -49,7 +49,6 @@ class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, ju
         self.outstream = cuda.Stream()
         # Create CUDA events
         self.finishedFetchRes = cuda.Event()
-        self.startedExec = cuda.Event()
         self.finishedExec = cuda.Event()
 
 
@@ -68,8 +67,6 @@ class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, ju
         self.memories['latest_frame'].htod(self.instream)
 
         self.instream.wait_for_event(self.finishedFetchRes)
-
-        self.startedExec.record(self.instream)
 
         self.engine.exec(self.instream)
     

@@ -73,12 +73,12 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
     def __init__(self, model_dir):
         super().__init__(model_dir)
         # create stream
-        self.stream = cuda.Stream()
+        self.updatestream = cuda.Stream()
+        self.instream = cuda.Stream()
+        self.outstream = cuda.Stream()
         # Create a CUDA events
-        self.start_event = cuda.Event()
-        self.end_event = cuda.Event()
-    def get_last_inference_time(self):
-        return self.start_event.time_till(self.end_event)
+        self.finishedFetchRes = cuda.Event()
+        self.finishedExec = cuda.Event()
     
     def setImage(self, img:np.ndarray):
         assert(len(img.shape) == 4 and 
@@ -87,27 +87,28 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
                img.shape[2] == 512 and 
                img.shape[3] == 512)
         np.copyto(self.memories['input_img'].host, img)
-        self.memories['input_img'].htod(self.stream)
-        self.decomposer.exec(self.stream)
-        self.stream.synchronize()
-    def inference(self, pose:np.ndarray):
+        self.memories['input_img'].htod(self.updatestream)
+        self.decomposer.exec(self.updatestream)
+        self.updatestream.synchronize()
+    def inference(self, pose:np.ndarray) -> np.ndarray: #Start inferencing given input and return result of previous frame
         
+        self.outstream.wait_for_event(self.finishedExec)
+        self.memories['output_img'].dtoh(self.outstream)
+        self.finishedFetchRes.record(self.outstream)
 
         np.copyto(self.memories['eyebrow_pose'].host, pose[:, :12])
-        self.memories['eyebrow_pose'].htod(self.stream)
+        self.memories['eyebrow_pose'].htod(self.instream)
         np.copyto(self.memories['face_pose'].host, pose[:,12:12+27])
-        self.memories['face_pose'].htod(self.stream)
+        self.memories['face_pose'].htod(self.instream)
         np.copyto(self.memories['rotation_pose'].host, pose[:,12+27:])
-        self.memories['rotation_pose'].htod(self.stream)
+        self.memories['rotation_pose'].htod(self.instream)
 
-        self.start_event.record(self.stream)
-        self.combiner.exec(self.stream)
-        self.morpher.exec(self.stream)
-        self.rotator.exec(self.stream)
-        self.editor.exec(self.stream)
-        self.end_event.record(self.stream)
-
-        self.memories['output_img'].dtoh(self.stream)
+        self.combiner.exec(self.instream)
+        self.morpher.exec(self.instream)
+        self.rotator.exec(self.instream)
+        self.instream.wait_for_event(self.finishedFetchRes)
+        self.editor.exec(self.instream)
+        self.finishedExec.record(self.instream)
         
-        self.stream.synchronize()
+        self.finishedFetchRes.synchronize()
         return self.memories['output_img'].host
