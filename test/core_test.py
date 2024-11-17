@@ -8,7 +8,7 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from typing import List, Tuple
 from tqdm import tqdm
-from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy, generate_video
+from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy, generate_video, thaimg_to_cvimg
 import json
 
 class THACoreSimple(THACore):
@@ -215,7 +215,7 @@ def THATestShow(): #include test for face param in the future
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
-        tha_res.append(img.copy())
+        tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/sepe16.mp4', 20)
 
     core = THACoreSimple('./data/tha3/seperable/fp32')
@@ -225,7 +225,7 @@ def THATestShow(): #include test for face param in the future
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
-        tha_res.append(img.copy())
+        tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/sepe32.mp4', 20)
     
 
@@ -236,7 +236,7 @@ def THATestShow(): #include test for face param in the future
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
-        tha_res.append(img.copy())
+        tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/stand32.mp4', 20)
 
     core = THACoreSimple('./data/tha3/standard/fp16')
@@ -246,7 +246,7 @@ def THATestShow(): #include test for face param in the future
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45))
-        tha_res.append(img.copy())
+        tha_res.append(thaimg_to_cvimg(img.copy()))
     generate_video(tha_res, './test/data/tha/stand16.mp4', 20)
 
 def RIFETestShow():
@@ -305,5 +305,5 @@ if __name__ == "__main__":
     # THAWithRifePerf()
     # THATestPerf()
     # RIFETestPerf()
-    # THATestShow()
-    RIFETestShow()
+    THATestShow()
+    # RIFETestShow()
