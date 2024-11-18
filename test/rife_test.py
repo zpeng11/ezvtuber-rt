@@ -30,6 +30,18 @@ def RIFETestPerf():
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2_fp32')
+    for i in tqdm(range(1000)):
+        ret = core.run(img1, img2)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3_fp32')
+    for i in tqdm(range(1000)):
+        ret = core.run(img1, img2)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4_fp32')
+    for i in tqdm(range(1000)):
+        ret = core.run(img1, img2)
+
     cuda.stop_profiler()
 
 def RIFETestShow():
@@ -90,6 +102,30 @@ def RIFETestShow():
     new_vid = createInterpolatedVideo(tha_res[::2], core)
     generate_video(new_vid, './test/data/rife/halfx4.mp4', 40)
 
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2_fp32')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x2_fp32.mp4', 40)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3_fp32')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x3_fp32.mp4', 60)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4_fp32')
+    new_vid = createInterpolatedVideo(tha_res, core)
+    generate_video(new_vid, './test/data/rife/x4_fp32.mp4', 80)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x2_fp32')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx2_fp32.mp4', 20)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x3_fp32')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx3_fp32.mp4', 30)
+
+    core = RIFECoreSimple('./data/rife_lite_v4_25/rife_x4_fp32')
+    new_vid = createInterpolatedVideo(tha_res[::2], core)
+    generate_video(new_vid, './test/data/rife/halfx4_fp32.mp4', 40)
 
 if __name__ == "__main__":
     os.makedirs('./test/data/rife', exist_ok=True)
