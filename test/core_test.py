@@ -156,4 +156,4 @@ def CoreTestShow():
 if __name__ == "__main__":
     os.makedirs('./test/data/core', exist_ok=True)
     CorePerf()
-    # CoreTestShow()
+    CoreTestShow()
