@@ -20,13 +20,15 @@ def cvimg_to_thaimg(im:np.ndarray):
     im = im.reshape(512 * 512, 4).transpose().reshape(1, 4, 512, 512) # Transpose to tensor shape
     return im
 
-def thaimg_to_cvimg(im:np.ndarray):
+def thaimg_to_cvimg(im:np.ndarray, alpha:bool):
     im = im.reshape(4, 512 * 512).transpose().reshape(512, 512, 4)
     im = (im + 1.0) / 2.0
     im[:,:,:3]= numpy_linear_to_srgb(im[:,:,:3])
     im = (im * 255.0).clip(0.0, 255.0).astype(np.uint8)
-    im = cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
-    return im
+    if alpha:
+        return cv2.cvtColor(im, cv2.COLOR_RGBA2BGRA)
+    else:
+        return cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
 
 def img_file_to_numpy(path:str, dtype:str = 'fp32'): # Image file to tha image
     im = cv2.imread(path, cv2.IMREAD_UNCHANGED)
@@ -38,7 +40,7 @@ def img_file_to_numpy(path:str, dtype:str = 'fp32'): # Image file to tha image
     return im
 
 def numpy_to_image_file(im:np.ndarray, path:str): # tha image to image file
-    im = thaimg_to_cvimg(im)
+    im = thaimg_to_cvimg(im, True if 'png' in path else False)
     cv2.imwrite(path, im)
 
 
