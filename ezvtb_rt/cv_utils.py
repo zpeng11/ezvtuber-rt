@@ -13,22 +13,30 @@ def numpy_linear_to_srgb(x:np.ndarray):
     x = np.clip(x, 0.0, 1.0)
     return np.where(x <= 0.003130804953560372, x * 12.92, 1.055 * (x ** (1.0 / 2.4)) - 0.055)
 
-def cvimg_to_thaimg(im:np.ndarray):
-    im = cv2.cvtColor(im, cv2.COLOR_BGRA2RGBA).astype(np.float32)/255.0 #To RGB float
+def cvimg_to_thaimg(im:np.ndarray, dtype:np.dtype = np.float32):
+    shapes = im.shape
+    im = cv2.cvtColor(im, cv2.COLOR_BGRA2RGBA).astype(dtype)/255.0 #To RGB float
     im[:,:,:3]= numpy_srgb_to_linear(im[:,:,:3]) #To linear
     im = im * 2.0 - 1.0 # Normalize to 0
-    im = im.reshape(512 * 512, 4).transpose().reshape(1, 4, 512, 512) # Transpose to tensor shape
+    im = im.reshape(shapes[0] * shapes[1], shapes[2]).transpose().reshape(1, shapes[2], shapes[0], shapes[1]) # Transpose to tensor shape
     return im
 
-def thaimg_to_cvimg(im:np.ndarray, alpha:bool):
-    im = im.reshape(4, 512 * 512).transpose().reshape(512, 512, 4)
+def thaimg_to_cvimg(im:np.ndarray, alpha:bool = False):
+    shapes = im.shape
+    im = im.reshape(shapes[1], shapes[2] * shapes[3]).transpose().reshape(shapes[2], shapes[3], shapes[1])
     im = (im + 1.0) / 2.0
     im[:,:,:3]= numpy_linear_to_srgb(im[:,:,:3])
     im = (im * 255.0).clip(0.0, 255.0).astype(np.uint8)
     if alpha:
-        return cv2.cvtColor(im, cv2.COLOR_RGBA2BGRA)
+        if shapes[1] == 4:
+            return cv2.cvtColor(im, cv2.COLOR_RGBA2BGRA)
+        else:
+            return cv2.cvtColor(im, cv2.COLOR_RGB2BGRA)
     else:
-        return cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
+        if shapes[1] == 4:
+            return cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
+        else:
+            return cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
 def img_file_to_numpy(path:str, dtype:str = 'fp32'): # Image file to tha image
     im = cv2.imread(path, cv2.IMREAD_UNCHANGED)

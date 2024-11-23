@@ -42,12 +42,13 @@ def JPEG2THARes(data:bytes , dtype:np.dtype = np.float16)->np.ndarray:
     
 
 class RAMCacher(Cacher):
-    def __init__(self, max_size:int, dtype:np.dtype = np.float16): #Size in GBs
+    def __init__(self, max_size:int, dtype:np.dtype = np.float16, quality:int = 90): #Size in GBs
         self.max_size = max_size
         self.cache = OrderedDict()
         self.hits = 0
         self.miss = 0
         self.dtype = dtype
+        self.quality = quality
     def read(self, hs:int) -> np.ndarray:
         cached = self.cache.get(hs)
         if cached is not None:
@@ -59,7 +60,7 @@ class RAMCacher(Cacher):
             self.miss += 1
             return None
     def write(self, hs:int, data:np.ndarray) -> tuple[int, np.ndarray]:
-        self.cache[hs] = THARes2JPEG(data)
+        self.cache[hs] = THARes2JPEG(data, self.quality)
         if len(self.cache) * len(self.cache[hs]) > self.max_size * 1024 * 1024 * 1024:
             return self.cache.popitem(last=False)
 
@@ -156,6 +157,8 @@ class DBCacherMP(Cacher):
         self.write_queue = Queue()
         self.writer = WriterProcess(self.write_queue, db_path, max_size, max_size)
         self.writer.start()
+        self.hits = 0
+        self.miss = 0
 
 
     def read(self, hs:int) -> np.ndarray:
@@ -163,13 +166,17 @@ class DBCacherMP(Cacher):
         try:
             ret = self.read_return.get(block=True, timeout=0.01) #Only wait for 10ms for read here
             while(ret[0] is int and ret[0] != hs):
-                ret = self.read_return.get(block=True, timeout=0.01) #Only wait for 10ms for read here
+                ret = self.read_return.get(block=True, timeout=0.01) # This works for removing missed read
+            if ret[1] is None:
+                self.miss += 1
+            else:
+                self.hits += 1
             return ret[1]
         except queue.Empty:
             return None
 
     def write(self, hs:int, data:np.ndarray):
-        self.write_queue.put_nowait(int, data)
+        self.write_queue.put_nowait((hs, data))
 
     def close(self):
         self.read_trigger.put_nowait(None)
