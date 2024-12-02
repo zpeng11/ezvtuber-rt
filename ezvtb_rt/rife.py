@@ -25,7 +25,8 @@ class RIFECore:
         self.setMemsToEngines()
 
     def prepareEngines(self, model_dir:str, engineT = Engine): #inherit and pass different engine type
-        self.engine = engineT(model_dir, 'rife', 2)
+        head_tail = os.path.split(model_dir)
+        self.engine = engineT(head_tail[0], head_tail[1], 2)
     def prepareMemories(self, latest_frame:HostDeviceMem): 
         self.memories = {}
         self.memories['old_frame'] = createMemory(self.engine.inputs[0])
