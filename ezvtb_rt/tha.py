@@ -26,6 +26,7 @@ class THACore:
         self.memories['input_img'] = createMemory(self.decomposer.inputs[0])
         self.memories["background_layer"] = createMemory(self.decomposer.outputs[0])
         self.memories["eyebrow_layer"] = createMemory(self.decomposer.outputs[1])
+        self.memories["image_prepared"] = createMemory(self.decomposer.outputs[2])
 
         self.memories['eyebrow_pose'] = createMemory(self.combiner.inputs[3])
         self.memories['eyebrow_image'] = createMemory(self.combiner.outputs[0])
@@ -40,20 +41,21 @@ class THACore:
         self.memories['grid_change'] = createMemory(self.rotator.outputs[1])
 
         self.memories['output_img'] = createMemory(self.editor.outputs[0])
+        self.memories['output_cv_img'] = createMemory(self.editor.outputs[1])
 
     def setMemsToEngines(self):
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Linking memories on VRAM to engine graph nodes')
         decomposer_inputs = [self.memories['input_img']]
         self.decomposer.setInputMems(decomposer_inputs)
-        decomposer_outputs = [self.memories["background_layer"], self.memories["eyebrow_layer"]]
+        decomposer_outputs = [self.memories["background_layer"], self.memories["eyebrow_layer"], self.memories["image_prepared"]]
         self.decomposer.setOutputMems(decomposer_outputs)
 
-        combiner_inputs = [self.memories['input_img'], self.memories["background_layer"], self.memories["eyebrow_layer"], self.memories['eyebrow_pose']]
+        combiner_inputs = [self.memories['image_prepared'], self.memories["background_layer"], self.memories["eyebrow_layer"], self.memories['eyebrow_pose']]
         self.combiner.setInputMems(combiner_inputs)
         combiner_outputs = [self.memories['eyebrow_image'], self.memories['morpher_decoded']]
         self.combiner.setOutputMems(combiner_outputs)
 
-        morpher_inputs = [self.memories['input_img'], self.memories['eyebrow_image'], self.memories['face_pose'], self.memories['morpher_decoded']]
+        morpher_inputs = [self.memories['image_prepared'], self.memories['eyebrow_image'], self.memories['face_pose'], self.memories['morpher_decoded']]
         self.morpher.setInputMems(morpher_inputs)
         morpher_outputs = [self.memories['face_morphed_full'], self.memories['face_morphed_half']]
         self.morpher.setOutputMems(morpher_outputs)
@@ -65,7 +67,7 @@ class THACore:
 
         editor_inputs = [self.memories['face_morphed_full'], self.memories['wrapped_image'], self.memories['grid_change'], self.memories['rotation_pose']]
         self.editor.setInputMems(editor_inputs)
-        editor_outputs = [self.memories['output_img']]
+        editor_outputs = [self.memories['output_img'], self.memories['output_cv_img']]
         self.editor.setOutputMems(editor_outputs)
 
 
@@ -81,11 +83,10 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
         self.finishedExec = cuda.Event()
     
     def setImage(self, img:np.ndarray):
-        assert(len(img.shape) == 4 and 
-               img.shape[0] == 1 and 
-               img.shape[1] == 4 and 
-               img.shape[2] == 512 and 
-               img.shape[3] == 512)
+        assert(len(img.shape) == 3 and 
+               img.shape[0] == 512 and 
+               img.shape[1] == 512 and 
+               img.shape[2] == 4)
         np.copyto(self.memories['input_img'].host, img)
         self.memories['input_img'].htod(self.updatestream)
         self.decomposer.exec(self.updatestream)
@@ -93,7 +94,7 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
     def inference(self, pose:np.ndarray) -> np.ndarray: #Start inferencing given input and return result of previous frame
         
         self.outstream.wait_for_event(self.finishedExec)
-        self.memories['output_img'].dtoh(self.outstream)
+        self.memories['output_cv_img'].dtoh(self.outstream)
         self.finishedFetchRes.record(self.outstream)
 
         np.copyto(self.memories['eyebrow_pose'].host, pose[:, :12])
@@ -111,4 +112,4 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
         self.finishedExec.record(self.instream)
         
         self.finishedFetchRes.synchronize()
-        return self.memories['output_img'].host
+        return self.memories['output_cv_img'].host
