@@ -10,7 +10,7 @@ from ezvtb_rt.tha import THACore
 class Core():
     def __init__(self, tha_model_dir, rift_model_dir):
         self.tha = THACore(tha_model_dir)
-        self.rife = RIFECore(rift_model_dir, scale = -1, latest_frame=self.tha.memories['output_img'])
+        self.rife = RIFECore(rift_model_dir, scale = -1, latest_frame=self.tha.memories['output_cv_img'])
         
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
@@ -20,11 +20,11 @@ class Core():
         self.resultFetchFinished = cuda.Event()
 
     def setImage(self, img:np.ndarray):
-        assert(len(img.shape) == 4 and 
-               img.shape[0] == 1 and 
-               img.shape[1] == 4 and 
-               img.shape[2] == 512 and 
-               img.shape[3] == 512)
+        assert(len(img.shape) == 3 and 
+               img.shape[0] == 512 and 
+               img.shape[1] == 512 and 
+               img.shape[2] == 4
+               )
         np.copyto(self.tha.memories['input_img'].host, img)
         self.tha.memories['input_img'].htod(self.updatestream)
         self.tha.decomposer.exec(self.updatestream)
@@ -38,7 +38,7 @@ class Core():
 
         self.resultFetchFinished.record(self.outstream)
 
-        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_img'].device, 
+        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_cv_img'].device, 
                                self.rife.memories['old_frame'].host.nbytes, self.instream)
 
         np.copyto(self.tha.memories['eyebrow_pose'].host, pose[:, :12])
