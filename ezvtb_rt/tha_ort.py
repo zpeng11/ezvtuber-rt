@@ -7,32 +7,32 @@ from typing import List
 import numpy as np
 
 def check_merge_graph(tha_dir:str, seperable:bool):
-    if not os.path.isfile(os.path.join(tha_dir, 'merged.onnx')):
-        decomposer = onnx.load(os.path.join(tha_dir, 'decomposer.onnx'))
-        decomposer = onnx.compose.add_prefix(decomposer,'decomposer_')
-        combiner = onnx.load(os.path.join(tha_dir, 'combiner.onnx'))
-        combiner = onnx.compose.add_prefix(combiner,'combiner_')
-        morpher = onnx.load(os.path.join(tha_dir, 'morpher.onnx'))
-        morpher = onnx.compose.add_prefix(morpher,'morpher_')
-        rotator = onnx.load(os.path.join(tha_dir, 'rotator.onnx'))
-        rotator = onnx.compose.add_prefix(rotator,'rotator_')
-        editor = onnx.load(os.path.join(tha_dir, 'editor.onnx'))
-        editor = onnx.compose.add_prefix(editor,'editor_')
-        if not seperable:
-            decoded_cut = ('combiner_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0', 'morpher_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0')
-        else:
-            decoded_cut = ('combiner_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0', 'morpher_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0')
-        merged = onnx.compose.merge_models(combiner, morpher,[('combiner_eyebrow_image', 'morpher_im_morpher_crop'),decoded_cut])
-        merged = onnx.compose.merge_models(merged, rotator, [('morpher_face_morphed_half','rotator_face_morphed_half')])
-        merged = onnx.compose.merge_models(merged, editor, [('morpher_face_morphed_full','editor_morphed_image'), 
-                                                ("rotator_full_warped_image", 'editor_rotated_warped_image'),
-                                                ("rotator_full_grid_change", 'editor_rotated_grid_change')], outputs=['editor_cv_result'])
-        
-        merged = onnx.compose.merge_models(decomposer, merged, [('decomposer_background_layer', 'combiner_eyebrow_background_layer'),
-                                                                ('decomposer_eyebrow_layer', 'combiner_eyebrow_layer'),
-                                                                ('decomposer_image_prepared', 'combiner_image_prepared'),
-                                                                ('decomposer_image_prepared', 'morpher_image_prepared')])
-        onnx.save_model(merged, os.path.join(tha_dir, 'merge.onnx'))
+    decomposer = onnx.load(os.path.join(tha_dir, 'decomposer.onnx'))
+    decomposer = onnx.compose.add_prefix(decomposer,'decomposer_')
+    combiner = onnx.load(os.path.join(tha_dir, 'combiner.onnx'))
+    combiner = onnx.compose.add_prefix(combiner,'combiner_')
+    morpher = onnx.load(os.path.join(tha_dir, 'morpher.onnx'))
+    morpher = onnx.compose.add_prefix(morpher,'morpher_')
+    rotator = onnx.load(os.path.join(tha_dir, 'rotator.onnx'))
+    rotator = onnx.compose.add_prefix(rotator,'rotator_')
+    editor = onnx.load(os.path.join(tha_dir, 'editor.onnx'))
+    editor = onnx.compose.add_prefix(editor,'editor_')
+    if not seperable:
+        decoded_cut = ('combiner_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0', 'morpher_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0')
+    else:
+        decoded_cut = ('combiner_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0', 'morpher_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0')
+    
+    merged = onnx.compose.merge_models(rotator, editor, [("rotator_full_warped_image", 'editor_rotated_warped_image'),
+                                            ("rotator_full_grid_change", 'editor_rotated_grid_change')], outputs=['editor_cv_result'])
+    merged = onnx.compose.merge_models(morpher, merged, [('morpher_face_morphed_full', 'editor_morphed_image'), 
+                                                         ('morpher_face_morphed_half', 'rotator_face_morphed_half')])
+    merged = onnx.compose.merge_models(combiner, merged, [('combiner_eyebrow_image', 'morpher_im_morpher_crop'), 
+                                                         decoded_cut])
+    merged = onnx.compose.merge_models(decomposer, merged, [('decomposer_background_layer', 'combiner_eyebrow_background_layer'), 
+                                                            ('decomposer_eyebrow_layer', "combiner_eyebrow_layer"),
+                                                            ('decomposer_image_prepared', 'combiner_image_prepared'),
+                                                            ('decomposer_image_prepared', 'morpher_image_prepared')])
+    onnx.save_model(merged, os.path.join(tha_dir, 'merge.onnx'))
 
 class THAORTCore:
     def __init__(self, tha_dir:str):
@@ -65,18 +65,20 @@ class THAORTCore:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
 
-        self.decomposer = ort.InferenceSession(os.path.join(self.tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)
-        self.merged = ort.InferenceSession(os.path.join(self.tha_dir, 'merge.onnx'), sess_options=options, providers=providers)
+        # self.decomposer = ort.InferenceSession(os.path.join(self.tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)
+        # self.merged = ort.InferenceSession(os.path.join(self.tha_dir, 'merge.onnx'), sess_options=options, providers=providers)
 
-        self.decomposed_background_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
-        self.decomposed_eyebrow_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
-        self.image_prepared =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,512,512), self.dtype, self.device)
-        self.face_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,27), np.float32, self.device)
-        self.rotation_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,6), np.float32, self.device)
-        self.eyebrow_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,12), np.float32, self.device)
-        self.result_image =  ort.OrtValue.ortvalue_from_shape_and_type((512,512, 4), np.uint8, self.device)
+        # self.decomposed_background_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
+        # self.decomposed_eyebrow_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
+        # self.image_prepared =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,512,512), self.dtype, self.device)
+        # self.face_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,27), np.float32, self.device)
+        # self.rotation_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,6), np.float32, self.device)
+        # self.eyebrow_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,12), np.float32, self.device)
+        # self.result_image =  ort.OrtValue.ortvalue_from_shape_and_type((512,512, 4), np.uint8, self.device)
 
-        self.binding = self.merged.io_binding()
+        # self.binding = self.merged.io_binding()
+        self.decomposer_sess = ort.InferenceSession(os.path.join(tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)#, sess_options=sess_options, providers=providers)
+        self.merged = ort.InferenceSession(os.path.join(tha_dir, "merge.onnx"), sess_options=options, providers=providers)
     # def update_image(self, img:np.ndarray):
     #     shapes = img.shape
     #     if len(shapes) != 3 or shapes[0]!= 512 or shapes[1] != 512 or shapes[2] != 4:
@@ -104,12 +106,24 @@ class THAORTCore:
     #     self.binding.synchronize_outputs()
     #     return self.binding.copy_outputs_to_cpu()
     def inference(self,img:np.ndarray, poses:np.ndarray):
-        return self.merged.run(None, {
-          'decomposer_input_image':img,
-          'combiner_eyebrow_pose':poses[:, :12],
-          'morpher_face_pose':poses[:,12:12+27],
-          'rotator_rotation_pose':poses[:,12+27:],
-          'editor_rotation_pose':poses[:,12+27:]
+        # decomposer_res = self.decomposer_sess.run(None, {'input_image':img,})
+        merged_res = self.merged.run(None, {
+            'decomposer_input_image':img,
+            'combiner_eyebrow_pose':poses[:, :12],
+            'morpher_face_pose': poses[:,12:12+27],
+            'rotator_rotation_pose':poses[:,12+27:],
+            'editor_rotation_pose':poses[:,12+27:]
         })
+        # merged_res = self.merged.run(None, {
+        #     'combiner_image_prepared':decomposer_res[2],
+        #     'combiner_eyebrow_background_layer': decomposer_res[0],
+        #     "combiner_eyebrow_layer": decomposer_res[1],
+        #     'combiner_eyebrow_pose':poses[:, :12],
+        #     'morpher_image_prepared':decomposer_res[2],
+        #     'morpher_face_pose': poses[:,12:12+27],
+        #     'rotator_rotation_pose':poses[:,12+27:],
+        #     'editor_rotation_pose':poses[:,12+27:]
+        # })
+        return merged_res[0]
 
 

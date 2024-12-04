@@ -19,12 +19,13 @@ def THAORTTestPerf():
 def THAORTTestShow():
     core = THAORTCore('./data/tha3/seperable/fp16')
     # core.update_image(cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
-    img = cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED)
+    
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
-        img = core.inference(img, np.array(pose).reshape(1,45).astype(np.float32))[0].copy()
+        inp = cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED)
+        img = core.inference(inp, np.array(pose).reshape(1,45).astype(np.float32)).copy()
         tha_res.append(img[:,:,:3])
     generate_video(tha_res, './test/data/tha_ort/sepe16.mp4', 20)
 
