@@ -56,7 +56,7 @@ class THAORTCore:
             self.device = 'dml'
         else:
             raise ValueError('Please check environment, ort does not have available gpu provider')
-
+        print('Using EP:', self.provider)
         check_merge_graph(self.tha_dir, self.seperable)
 
         providers = [ self.provider]
@@ -65,65 +65,39 @@ class THAORTCore:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
 
-        # self.decomposer = ort.InferenceSession(os.path.join(self.tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)
-        # self.merged = ort.InferenceSession(os.path.join(self.tha_dir, 'merge.onnx'), sess_options=options, providers=providers)
-
         # self.decomposed_background_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
         # self.decomposed_eyebrow_layer =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,128,128), self.dtype, self.device)
         # self.image_prepared =  ort.OrtValue.ortvalue_from_shape_and_type((1,4,512,512), self.dtype, self.device)
-        # self.face_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,27), np.float32, self.device)
-        # self.rotation_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,6), np.float32, self.device)
-        # self.eyebrow_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,12), np.float32, self.device)
-        # self.result_image =  ort.OrtValue.ortvalue_from_shape_and_type((512,512, 4), np.uint8, self.device)
-
-        # self.binding = self.merged.io_binding()
-        self.decomposer_sess = ort.InferenceSession(os.path.join(tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)#, sess_options=sess_options, providers=providers)
+        self.input_image =  ort.OrtValue.ortvalue_from_shape_and_type((512,512, 4), np.uint8, self.device)
+        self.face_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,27), np.float32, self.device)
+        self.rotation_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,6), np.float32, self.device)
+        self.eyebrow_pose = ort.OrtValue.ortvalue_from_shape_and_type((1,12), np.float32, self.device)
+        self.result_image =  ort.OrtValue.ortvalue_from_shape_and_type((512,512, 4), np.uint8, self.device)
+        
+        # self.decomposer_sess = ort.InferenceSession(os.path.join(tha_dir, 'decomposer.onnx'), sess_options=options, providers=providers)#, sess_options=sess_options, providers=providers)
         self.merged = ort.InferenceSession(os.path.join(tha_dir, "merge.onnx"), sess_options=options, providers=providers)
-    # def update_image(self, img:np.ndarray):
-    #     shapes = img.shape
-    #     if len(shapes) != 3 or shapes[0]!= 512 or shapes[1] != 512 or shapes[2] != 4:
-    #         raise ValueError('Not valid update image')
-    #     decomposed = self.decomposer.run(None, {'input_image':img})
-    #     self.decomposed_background_layer.update_inplace(decomposed[0])
-    #     self.decomposed_eyebrow_layer.update_inplace(decomposed[1])
-    #     self.image_prepared.update_inplace(decomposed[2])
-    #     self.binding.bind_ortvalue_input('combiner_image_prepared',self.image_prepared)
-    #     self.binding.bind_ortvalue_input('morpher_image_prepared',self.image_prepared)
-    #     self.binding.bind_ortvalue_input('combiner_eyebrow_background_layer',self.decomposed_background_layer)
-    #     self.binding.bind_ortvalue_input('combiner_eyebrow_layer', self.decomposed_eyebrow_layer)
-    #     self.binding.bind_ortvalue_output('editor_cv_result', self.result_image)
-    #     self.binding.synchronize_inputs()
-    # def inference(self, poses:np.ndarray):
-    #     self.eyebrow_pose.update_inplace(poses[:, :12])
-    #     self.face_pose.update_inplace(poses[:,12:12+27])
-    #     self.rotation_pose.update_inplace(poses[:,12+27:])
-    #     self.binding.bind_ortvalue_input('combiner_eyebrow_pose', self.eyebrow_pose)
-    #     self.binding.bind_ortvalue_input('morpher_face_pose', self.face_pose)
-    #     self.binding.bind_ortvalue_input('rotator_rotation_pose', self.rotation_pose)
-    #     self.binding.bind_ortvalue_input('editor_rotation_pose', self.rotation_pose)
-    #     self.binding.synchronize_inputs()
-    #     self.merged.run_with_iobinding(self.binding)
-    #     self.binding.synchronize_outputs()
-    #     return self.binding.copy_outputs_to_cpu()
-    def inference(self,img:np.ndarray, poses:np.ndarray):
-        # decomposer_res = self.decomposer_sess.run(None, {'input_image':img,})
-        merged_res = self.merged.run(None, {
-            'decomposer_input_image':img,
-            'combiner_eyebrow_pose':poses[:, :12],
-            'morpher_face_pose': poses[:,12:12+27],
-            'rotator_rotation_pose':poses[:,12+27:],
-            'editor_rotation_pose':poses[:,12+27:]
-        })
-        # merged_res = self.merged.run(None, {
-        #     'combiner_image_prepared':decomposer_res[2],
-        #     'combiner_eyebrow_background_layer': decomposer_res[0],
-        #     "combiner_eyebrow_layer": decomposer_res[1],
-        #     'combiner_eyebrow_pose':poses[:, :12],
-        #     'morpher_image_prepared':decomposer_res[2],
-        #     'morpher_face_pose': poses[:,12:12+27],
-        #     'rotator_rotation_pose':poses[:,12+27:],
-        #     'editor_rotation_pose':poses[:,12+27:]
-        # })
-        return merged_res[0]
+
+        self.binding = self.merged.io_binding()
+        self.binding.bind_ortvalue_input('decomposer_input_image', self.input_image)
+        self.binding.bind_ortvalue_input('combiner_eyebrow_pose', self.eyebrow_pose)
+        self.binding.bind_ortvalue_input('morpher_face_pose', self.face_pose)
+        self.binding.bind_ortvalue_input('rotator_rotation_pose', self.rotation_pose)
+        self.binding.bind_ortvalue_input('editor_rotation_pose', self.rotation_pose)
+        self.binding.bind_ortvalue_output('editor_cv_result', self.result_image)
+    def update_image(self, img:np.ndarray):
+        shapes = img.shape
+        if len(shapes) != 3 or shapes[0]!= 512 or shapes[1] != 512 or shapes[2] != 4:
+            raise ValueError('Not valid update image')
+        self.input_image.update_inplace(img)
+
+    def inference(self, poses:np.ndarray):
+        
+        self.eyebrow_pose.update_inplace(poses[:, :12])
+        self.face_pose.update_inplace(poses[:,12:12+27])
+        self.rotation_pose.update_inplace(poses[:,12+27:])
+
+        self.merged.run_with_iobinding(self.binding)
+
+        return self.result_image.numpy()
 
 
