@@ -6,9 +6,37 @@ import onnx
 from typing import List
 import numpy as np
 
-def check_merge_graph(tha_dir:str, seperable:bool):
+def merge_graph_all(tha_dir:str, seperable:bool):
+    #merge all models into one
     decomposer = onnx.load(os.path.join(tha_dir, 'decomposer.onnx'))
     decomposer = onnx.compose.add_prefix(decomposer,'decomposer_')
+    combiner = onnx.load(os.path.join(tha_dir, 'combiner.onnx'))
+    combiner = onnx.compose.add_prefix(combiner,'combiner_')
+    morpher = onnx.load(os.path.join(tha_dir, 'morpher.onnx'))
+    morpher = onnx.compose.add_prefix(morpher,'morpher_')
+    rotator = onnx.load(os.path.join(tha_dir, 'rotator.onnx'))
+    rotator = onnx.compose.add_prefix(rotator,'rotator_')
+    editor = onnx.load(os.path.join(tha_dir, 'editor.onnx'))
+    editor = onnx.compose.add_prefix(editor,'editor_')
+    if not seperable:
+        decoded_cut = ('combiner_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0', 'morpher_/face_morpher/downsample_blocks.3/downsample_blocks.3.2/Relu_output_0')
+    else:
+        decoded_cut = ('combiner_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0', 'morpher_/face_morpher/body/downsample_blocks.3/downsample_blocks.3.3/Relu_output_0')
+    
+    merged = onnx.compose.merge_models(rotator, editor, [("rotator_full_warped_image", 'editor_rotated_warped_image'),
+                                            ("rotator_full_grid_change", 'editor_rotated_grid_change')], outputs=['editor_cv_result'])
+    merged = onnx.compose.merge_models(morpher, merged, [('morpher_face_morphed_full', 'editor_morphed_image'), 
+                                                         ('morpher_face_morphed_half', 'rotator_face_morphed_half')])
+    merged = onnx.compose.merge_models(combiner, merged, [('combiner_eyebrow_image', 'morpher_im_morpher_crop'), 
+                                                         decoded_cut])
+    merged = onnx.compose.merge_models(decomposer, merged, [('decomposer_background_layer', 'combiner_eyebrow_background_layer'), 
+                                                            ('decomposer_eyebrow_layer', "combiner_eyebrow_layer"),
+                                                            ('decomposer_image_prepared', 'combiner_image_prepared'),
+                                                            ('decomposer_image_prepared', 'morpher_image_prepared')])
+    onnx.save_model(merged, os.path.join(tha_dir, 'merge_all.onnx'))
+
+def merge_graph(tha_dir:str, seperable:bool):
+    #Merge models except for decomposer
     combiner = onnx.load(os.path.join(tha_dir, 'combiner.onnx'))
     combiner = onnx.compose.add_prefix(combiner,'combiner_')
     morpher = onnx.load(os.path.join(tha_dir, 'morpher.onnx'))
@@ -54,7 +82,7 @@ class THAORTCore:
             raise ValueError('Please check environment, ort does not have available gpu provider')
         print('Using EP:', self.provider)
         
-        check_merge_graph(self.tha_dir, self.seperable)
+        merge_graph(self.tha_dir, self.seperable)
 
         providers = [ self.provider]
         options = ort.SessionOptions()
