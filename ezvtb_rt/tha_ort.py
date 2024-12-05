@@ -136,3 +136,52 @@ class THAORTCore:
         return self.result_image.numpy()
 
 
+class THAORTCoreNonDefault:
+    #Interesting bug in onnxruntime that ortValue with dml only support default device (device=0), 
+    #Which means when using a nondefault ORT device, we can not use any vram cache but have to merge graph to reduce passage through pcie boundary
+    def __init__(self, tha_dir:str, device_id:int):
+        # if device_id == 0:
+            # raise ValueError('Use the default version for this device because that is faster')
+        self.tha_dir = tha_dir
+        if 'fp16' in tha_dir:
+            self.dtype = np.float16
+        else:
+            self.dtype = np.float32
+
+        if 'seperable' in tha_dir:
+            self.seperable = True
+        else:
+            self.seperable = False 
+
+        avaliales = ort.get_available_providers()
+        if 'CUDAExecutionProvider' in avaliales:
+            self.provider = 'CUDAExecutionProvider'
+            self.device = 'cuda'
+        elif 'DmlExecutionProvider' in avaliales:
+            self.provider = 'DmlExecutionProvider'
+            self.device = 'dml'
+        else:
+            raise ValueError('Please check environment, ort does not have available gpu provider')
+        print('Using EP:', self.provider)
+        
+        merge_graph_all(self.tha_dir, self.seperable)
+
+        providers = [ self.provider]
+        options = ort.SessionOptions()
+        options.enable_mem_pattern = False
+        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        provider_options = [{'device_id':device_id}]
+
+        self.merged = ort.InferenceSession(os.path.join(tha_dir, "merge_all.onnx"), sess_options=options, providers=providers, provider_options=provider_options)
+    def update_image(self, img:np.ndarray):
+        self.img = img
+
+    def inference(self, poses:np.ndarray):
+        return self.merged.run(None, {
+            'decomposer_input_image':self.img,
+            'combiner_eyebrow_pose': poses[:, :12],
+            'morpher_face_pose':poses[:,12:12+27],
+            'rotator_rotation_pose':poses[:,12+27:],
+            'editor_rotation_pose':poses[:,12+27:],
+        })[0]
