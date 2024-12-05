@@ -58,11 +58,11 @@ def THAORTTestPerf():
         core.inference(rand_pose)
 
 def THAORTTestShow():
-    core = THAORTCore('./data/tha3/seperable/fp16')
-    core.update_image(cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
-    
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
+
+    core = THAORTCore('./data/tha3/seperable/fp16')
+    core.update_image(cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
         img = core.inference(np.array(pose).reshape(1,45).astype(np.float32)).copy()
