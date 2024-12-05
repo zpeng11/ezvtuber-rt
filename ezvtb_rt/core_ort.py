@@ -19,5 +19,3 @@ class CoreORT:
     def inference(self, pose:np.ndarray) -> List[np.ndarray]:
         tha_res = self.tha.inference(pose.astype(np.float32))
         return self.rife.inference(tha_res)
-
-    

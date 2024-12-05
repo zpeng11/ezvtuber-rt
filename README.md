@@ -8,9 +8,9 @@ Windows only, Linux may work if you can figure out environment.
 
 仅Windows
 ### Graphic Card
-Nvidia Turing microarchitecture graphic cards only. Any gaming card higher than GeForce 16/20 series. For example all my tests are done on a GTX1660SUPER without any issue. Better gpu would give higher framerate, allow using higher percision model, and lower resource consumption.
+Supporting DirectML for AMD and Intel GPU, cuda/TensorRT accelerate for Nvidia. TensorRT supports Nvidia Turing microarchitecture graphic cards and above. Any gaming card higher than GeForce 16/20 series. For example all my tests are done on a GTX1660SUPER without any issue. Better gpu would give higher framerate, allow using higher percision model, and lower resource consumption.
 
-仅支持16和20系以上的英伟达显卡，更好的显卡可以输出更高原生帧率，使用精度更高的模型和更少的系统占用。
+A卡I卡使用DirectML, 有性能但不多，而且python的ort接口无法避免跨设备拷贝有性能损失。n卡可使用cuda或Tensorrt。TensorRT加速支持16和20系以上的英伟达显卡，配合cuda接口性能有跨越式提升，更好的显卡可以输出更高原生帧率，使用精度更高的模型和更少的系统占用。
 ## Key Improvements
 
 ### Static Models

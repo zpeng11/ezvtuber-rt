@@ -98,5 +98,5 @@ def RIFEORTTestShow():
 
 if __name__ == "__main__":
     os.makedirs('./test/data/rife_ort', exist_ok=True)
-    # RIFEORTTestPerf()
+    RIFEORTTestPerf()
     RIFEORTTestShow()
