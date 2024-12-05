@@ -125,7 +125,7 @@ class THAORTCore:
         self.image_prepared.update_inplace(decomposed[2])
 
 
-    def inference(self, poses:np.ndarray):
+    def inference(self, poses:np.ndarray) -> np.ndarray:
         
         self.eyebrow_pose.update_inplace(poses[:, :12])
         self.face_pose.update_inplace(poses[:,12:12+27])
