@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 from ezvtb_rt.trt_utils import *
 from os.path import join
 from ezvtb_rt.engine import Engine, createMemory
+from collections import OrderedDict
 
 
 class THACore:
@@ -93,6 +94,72 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
         self.updatestream.synchronize()
     def inference(self, pose:np.ndarray) -> np.ndarray: #Start inferencing given input and return result of previous frame
         
+        self.outstream.wait_for_event(self.finishedExec)
+        self.memories['output_cv_img'].dtoh(self.outstream)
+        self.finishedFetchRes.record(self.outstream)
+
+        np.copyto(self.memories['eyebrow_pose'].host, pose[:, :12])
+        self.memories['eyebrow_pose'].htod(self.instream)
+        np.copyto(self.memories['face_pose'].host, pose[:,12:12+27])
+        self.memories['face_pose'].htod(self.instream)
+        np.copyto(self.memories['rotation_pose'].host, pose[:,12+27:])
+        self.memories['rotation_pose'].htod(self.instream)
+
+        self.combiner.exec(self.instream)
+        self.morpher.exec(self.instream)
+        self.rotator.exec(self.instream)
+        self.instream.wait_for_event(self.finishedFetchRes)
+        self.editor.exec(self.instream)
+        self.finishedExec.record(self.instream)
+        
+        self.finishedFetchRes.synchronize()
+        return self.memories['output_cv_img'].host
+
+
+class THACoreCached(THACore): #Cached implementation of tensorrt tha core
+    def __init__(self, model_dir, vram_cache_size:int = 1):
+        super().__init__(model_dir)
+        self.dtype = self.memories['image_prepared'].host.dtype
+        self.eyebrow_image_shape = self.memories['eyebrow_image'].host.shape
+        self.morpher_decoded_shape = self.memories['morpher_decoded'].host.shape
+        self.face_morphed_full_shape = self.memories['face_morphed_full'].host.shape
+        self.face_morphed_half_shape = self.memories['face_morphed_half'].host.shape
+        self.cache = OrderedDict()
+        self.cached_kbytes = 0
+        # create stream
+        self.updatestream = cuda.Stream()
+        self.instream = cuda.Stream()
+        self.outstream = cuda.Stream()
+        # Create a CUDA events
+        self.finishedFetchRes = cuda.Event()
+        self.finishedExec = cuda.Event()
+    
+    def setImage(self, img:np.ndarray):
+        assert(len(img.shape) == 3 and 
+               img.shape[0] == 512 and 
+               img.shape[1] == 512 and 
+               img.shape[2] == 4)
+        np.copyto(self.memories['input_img'].host, img)
+        self.memories['input_img'].htod(self.updatestream)
+        self.decomposer.exec(self.updatestream)
+        self.updatestream.synchronize()
+
+    def inference(self, pose:np.ndarray) -> np.ndarray: 
+        eyebrow_pose = pose[:, :12]
+        face_pose = pose[:,12:12+27]
+        rotation_pose = pose[:,12+27:]
+
+        morpher_hash = hash(str(pose[:,:12+27]))
+        morpher_cached = self.cache.get(morpher_hash)
+        combiner_hash = hash(str(pose[:,:12]))
+        combiner_cached = self.cache.get(combiner_hash)
+        if(morpher_cached is not None):
+            pass
+        elif(combiner_cached is not None):
+            pass
+        else:
+            pass
+
         self.outstream.wait_for_event(self.finishedExec)
         self.memories['output_cv_img'].dtoh(self.outstream)
         self.finishedFetchRes.record(self.outstream)
