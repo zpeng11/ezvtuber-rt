@@ -12,9 +12,11 @@ def RAMCacherTest():
     img = cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED)
     buf = np.ndarray((512, 512, 4), dtype=np.uint8)
     cacher = RAMCacher(1)
-    for i in tqdm(range(10000)):
+    for i in tqdm(range(1000)):
+        time.sleep(0.02)
+        cacher.read(random.randint(-1000000000, 1000000000))
         cacher.write(i, img)
-    for i in tqdm(range(10000)):
+    for i in tqdm(range(1000)):
         buf[:,:,:3] = cacher.read(i)[:,:,:3]
     cv2.imwrite('./test/data/cache/ram_cacher.jpg', cacher.read(0))
 
@@ -37,5 +39,5 @@ def DBCacherTest():
 
 if __name__ == '__main__':
     os.makedirs('./test/data/cache', exist_ok=True)
-    # RAMCacherTest()
+    RAMCacherTest()
     DBCacherTest()
