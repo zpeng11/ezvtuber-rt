@@ -5,6 +5,7 @@ from ezvtb_rt.trt_utils import *
 from os.path import join
 from ezvtb_rt.engine import Engine, createMemory
 from collections import OrderedDict
+from typing import Set
 
 
 class THACore:
@@ -128,16 +129,53 @@ class VRAMMem(object):
     def __del__(self):
         self.device.free()
 
+
+class VRAMCacher(object):
+    def __init__(self, nbytes1:int, nbytes2:int, max_size:float):
+        sum_nkbytes = (nbytes1 + nbytes2)/1024
+        self.pool = []
+        while len(self.pool) * sum_nkbytes < max_size * 1024 * 1024:
+            self.pool.append((VRAMMem(nbytes1), VRAMMem(nbytes2)))
+        self.nbytes1 = nbytes1
+        self.nbytes2 = nbytes2
+        self.cache = OrderedDict()
+        self.hits = 0
+        self.miss = 0
+    def query(self, hs:int)->bool:
+        cached = self.cache.get(hs)
+        if cached is not None:
+            return True
+        else:
+            return False
+    def read_mem_set(self, hs:int)->set[VRAMMem, VRAMMem]:
+        cached = self.cache.get(hs)
+        if cached is not None:
+            self.hits += 1
+            self.cache.move_to_end(hs)
+            return cached
+        else:
+            self.miss += 1
+            return None
+    def write_mem_set(self, hs:int)->set[VRAMMem, VRAMMem]:
+        cached = self.cache.get(hs)
+        if cached is not None:
+            raise ValueError('Should not write to vram cacher with existing hash')
+        if len(self.pool) != 0:
+            mem_set = self.pool.pop()
+        else:
+            mem_set = self.cache.popitem(last=False)[1]
+        self.cache[hs] = mem_set
+        return mem_set
+
 class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
     def __init__(self, model_dir, vram_cache_size:float = 1):
         super().__init__(model_dir)
-        self.cache = OrderedDict()
-        self.cached_kbytes = 0
-        self.max_cached_kbytes = int(vram_cache_size * 1024 * 1024)
-        self.morpher_cache_size = (self.memories['face_morphed_full'].host.nbytes + self.memories['face_morphed_half'].host.nbytes)//1024
-        self.combiner_cache_size = (self.memories['eyebrow_image'].host.nbytes + self.memories['morpher_decoded'].host.nbytes)//1024
-        self.hits = 0
-        self.miss = 0
+        self.combiner_cacher = VRAMCacher(self.memories['eyebrow_image'].host.nbytes, 
+                                          self.memories['morpher_decoded'].host.nbytes, 
+                                          0.3 * vram_cache_size)
+        self.morpher_cacher = VRAMCacher(self.memories['face_morphed_full'].host.nbytes,
+                                         self.memories['face_morphed_half'].host.nbytes,
+                                         0.7 * vram_cache_size)
         self.returned = False
         # create stream
         self.updatestream = cuda.Stream()
@@ -167,24 +205,19 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         self.memories['rotation_pose'].htod(self.instream)
 
         morpher_hash = hash(str(pose[:,:12+27]))
-        morpher_cached = self.cache.get(morpher_hash)
+        morpher_cached = self.morpher_cacher.read_mem_set(morpher_hash)
         combiner_hash = hash(str(pose[:,:12]))
-        combiner_cached = self.cache.get(combiner_hash)
+        combiner_cached = self.combiner_cacher.read_mem_set(combiner_hash)
 
         self.cachestream.synchronize()
         if(morpher_cached is not None):
-            self.hits += 1
-            self.cache.move_to_end(morpher_hash)
             cuda.memcpy_dtod_async(self.memories['face_morphed_full'].device, morpher_cached[0].device, 
                                    self.memories['face_morphed_full'].host.nbytes, self.instream)
             cuda.memcpy_dtod_async(self.memories['face_morphed_half'].device, morpher_cached[1].device, 
                                    self.memories['face_morphed_half'].host.nbytes, self.instream)
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
         elif(combiner_cached is not None):
-            self.hits += 1
-            self.cache.move_to_end(combiner_hash)
             #prepare input
             cuda.memcpy_dtod_async(self.memories['eyebrow_image'].device, combiner_cached[0].device, 
                                    self.memories['eyebrow_image'].host.nbytes, self.instream)
@@ -196,29 +229,19 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             #Execute morpher
             self.morpher.exec(self.instream)
             self.finishedMorpher.record(self.instream)
-
-            #cache morpher result
-            self.cachestream.wait_for_event(self.finishedMorpher)
-            face_morphed_full_cached = VRAMMem(self.memories['face_morphed_full'].host.nbytes)
-            face_morphed_half_cached = VRAMMem(self.memories['face_morphed_half'].host.nbytes)
-            cuda.memcpy_dtod_async(face_morphed_full_cached.device, self.memories['face_morphed_full'].device, 
-                                   self.memories['face_morphed_full'].host.nbytes, self.cachestream)
-            cuda.memcpy_dtod_async(face_morphed_half_cached.device, self.memories['face_morphed_half'].device, 
-                                   self.memories['face_morphed_half'].host.nbytes, self.cachestream)
             
             #Execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
 
-            #save morpher cache
-            self.cache[morpher_hash] = (face_morphed_full_cached, face_morphed_half_cached, self.morpher_cache_size)
-            self.cached_kbytes += (self.morpher_cache_size)
-            while(self.cached_kbytes > self.max_cached_kbytes):
-                poped = self.cache.popitem(last=False)
-                self.cached_kbytes -= poped[1][2] 
+            #cache morpher result
+            self.cachestream.wait_for_event(self.finishedMorpher)
+            morpher_cache_write = self.morpher_cacher.write_mem_set(morpher_hash)
+            cuda.memcpy_dtod_async(morpher_cache_write[0].device, self.memories['face_morphed_full'].device, 
+                                   self.memories['face_morphed_full'].host.nbytes, self.cachestream)
+            cuda.memcpy_dtod_async(morpher_cache_write[1].device, self.memories['face_morphed_half'].device, 
+                                   self.memories['face_morphed_half'].host.nbytes, self.cachestream)
         else:
-            self.miss += 1
             #prepare input
             np.copyto(self.memories['face_pose'].host, face_pose)
             self.memories['face_pose'].htod(self.instream)
@@ -228,44 +251,33 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             #execute combiner
             self.combiner.exec(self.instream)
             self.finishedCombiner.record(self.instream)
-
-            #cache morpher result
-            self.cachestream.wait_for_event(self.finishedCombiner)
-            eyebrow_image_cached = VRAMMem(self.memories['eyebrow_image'].host.nbytes)
-            morpher_decoded_cached = VRAMMem(self.memories['morpher_decoded'].host.nbytes)
-            cuda.memcpy_dtod_async(eyebrow_image_cached.device, self.memories['eyebrow_image'].device, 
-                                   self.memories['eyebrow_image'].host.nbytes, self.cachestream)
-            cuda.memcpy_dtod_async(morpher_decoded_cached.device, self.memories['morpher_decoded'].device, 
-                                   self.memories['morpher_decoded'].host.nbytes, self.cachestream)
             
             #execute morpher
             self.morpher.exec(self.instream)
             self.finishedMorpher.record(self.instream)
-            
-            #cache morpher result
-            self.cachestream.wait_for_event(self.finishedMorpher)
-            face_morphed_full_cached = VRAMMem(self.memories['face_morphed_full'].host.nbytes)
-            face_morphed_half_cached = VRAMMem(self.memories['face_morphed_half'].host.nbytes)
-            cuda.memcpy_dtod_async(face_morphed_full_cached.device, self.memories['face_morphed_full'].device, 
-                                   self.memories['face_morphed_full'].host.nbytes, self.cachestream)
-            cuda.memcpy_dtod_async(face_morphed_half_cached.device, self.memories['face_morphed_half'].device, 
-                                   self.memories['face_morphed_half'].host.nbytes, self.cachestream)
-            
+
             #execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
-            self.finishedTHA.record(self.instream)
 
-            #save caches
-            self.cache[combiner_hash] = (eyebrow_image_cached, morpher_decoded_cached, self.combiner_cache_size)
-            self.cached_kbytes += (self.combiner_cache_size)
-            self.cache[morpher_hash] = (face_morphed_full_cached, face_morphed_half_cached, self.morpher_cache_size)
-            self.cached_kbytes += (self.morpher_cache_size)
-            while(self.cached_kbytes > self.max_cached_kbytes):
-                poped = self.cache.popitem(last=False)
-                self.cached_kbytes -= poped[1][2] 
+            #cache morpher result
+            combiner_cache_write = self.combiner_cacher.write_mem_set(combiner_hash)
+            self.cachestream.wait_for_event(self.finishedCombiner)
+            cuda.memcpy_dtod_async(combiner_cache_write[0].device, self.memories['eyebrow_image'].device, 
+                                   self.memories['eyebrow_image'].host.nbytes, self.cachestream)
+            cuda.memcpy_dtod_async(combiner_cache_write[1].device, self.memories['morpher_decoded'].device, 
+                                   self.memories['morpher_decoded'].host.nbytes, self.cachestream)
+            
+            #cache morpher result
+            morpher_cache_write = self.morpher_cacher.write_mem_set(morpher_hash)
+            self.cachestream.wait_for_event(self.finishedMorpher)
+            cuda.memcpy_dtod_async(morpher_cache_write[0].device, self.memories['face_morphed_full'].device, 
+                                   self.memories['face_morphed_full'].host.nbytes, self.cachestream)
+            cuda.memcpy_dtod_async(morpher_cache_write[1].device, self.memories['face_morphed_half'].device, 
+                                   self.memories['face_morphed_half'].host.nbytes, self.cachestream)
         
+        self.memories['output_cv_img'].dtoh(self.instream)
+        self.finishedTHA.record(self.instream)
         self.returned = False
         if return_now:
             self.finishedTHA.synchronize()
