@@ -130,18 +130,22 @@ def THACacheRAMPerf():
     cuda.stop_profiler()
 
 def THACacheVRAMShow():
-    core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
+    core = THACoreSimple('./data/tha3/seperable/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
-        img = core.inference(np.array(pose).reshape(1,45), True)
+        img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(img.copy()[:,:,:3])
+    tha_res = tha_res[1:]
 
+    core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
+    core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     tha_res_cached = []
     for i, pose in enumerate(pose_data[800:1000]):
-        img = core.inference(np.array(pose).reshape(1,45), True)
+        img = core.inference(np.array(pose).reshape(1,45), False)
+        img = core.fetchRes()
         tha_res_cached.append(img.copy()[:,:,:3])
 
     mae = 0
@@ -152,18 +156,22 @@ def THACacheVRAMShow():
     print(core.combiner_cacher.hits, core.combiner_cacher.miss, core.morpher_cacher.hits, core.morpher_cacher.miss)
 
 def THACacheRAMShow():
-    core = THACoreCachedRAM('./data/tha3/seperable/fp16')
+    core = THACoreSimple('./data/tha3/seperable/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
     tha_res = []
     for i, pose in enumerate(pose_data[800:1000]):
-        img = core.inference(np.array(pose).reshape(1,45), True)
+        img = core.inference(np.array(pose).reshape(1,45))
         tha_res.append(img.copy()[:,:,:3])
+    tha_res = tha_res[1:]
 
+    core = THACoreCachedRAM('./data/tha3/seperable/fp16')
+    core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     tha_res_cached = []
     for i, pose in enumerate(pose_data[800:1000]):
-        img = core.inference(np.array(pose).reshape(1,45), True)
+        img = core.inference(np.array(pose).reshape(1,45), False)
+        img = core.fetchRes()
         tha_res_cached.append(img.copy()[:,:,:3])
 
     mae = 0
@@ -180,6 +188,6 @@ if __name__ == "__main__":
     # THATestPerf()
     # THACacheVRAMPerf()
     # THACacheVRAMShow()
-    THACacheRAMPerf()
-    # THACacheRAMShow()
+    # THACacheRAMPerf()
+    THACacheRAMShow()
     

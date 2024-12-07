@@ -184,10 +184,12 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
         self.cachestream = cuda.Stream()
+        self.outstream = cuda.Stream()
         # Create a CUDA events
         self.finishedMorpher = cuda.Event()
         self.finishedCombiner = cuda.Event()
-        self.finishedTHA = cuda.Event()
+        self.finishedFetch = cuda.Event()
+        self.finishedExec = cuda.Event()
     
     def setImage(self, img:np.ndarray):
         assert(len(img.shape) == 3 and 
@@ -213,6 +215,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         combiner_cached = self.combiner_cacher.read_mem_set(combiner_hash)
 
         self.cachestream.synchronize()
+        self.outstream.synchronize()
         if(morpher_cached is not None):
             cuda.memcpy_dtod_async(self.memories['face_morphed_full'].device, morpher_cached[0].device, 
                                    self.memories['face_morphed_full'].host.nbytes, self.instream)
@@ -220,6 +223,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
                                    self.memories['face_morphed_half'].host.nbytes, self.instream)
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
         elif(combiner_cached is not None):
             #prepare input
             cuda.memcpy_dtod_async(self.memories['eyebrow_image'].device, combiner_cached[0].device, 
@@ -236,6 +240,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             #Execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
 
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedMorpher)
@@ -262,6 +267,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             #execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
 
             #cache morpher result
             combiner_cache_write = self.combiner_cacher.write_mem_set(combiner_hash)
@@ -279,11 +285,12 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             cuda.memcpy_dtod_async(morpher_cache_write[1].device, self.memories['face_morphed_half'].device, 
                                    self.memories['face_morphed_half'].host.nbytes, self.cachestream)
         
-        self.memories['output_cv_img'].dtoh(self.instream)
-        self.finishedTHA.record(self.instream)
+        self.outstream.wait_for_event(self.finishedExec)
+        self.memories['output_cv_img'].dtoh(self.outstream)
+        self.finishedFetch.record(self.outstream)
         self.returned = False
         if return_now:
-            self.finishedTHA.synchronize()
+            self.finishedFetch.synchronize()
             self.returned = True
             return self.memories['output_cv_img'].host
         else:
@@ -291,7 +298,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
     def fetchRes(self)->np.ndarray:
         if self.returned == True:
             raise ValueError('Already fetched result')
-        self.finishedTHA.synchronize()
+        self.finishedFetch.synchronize()
         self.returned = True
         return self.memories['output_cv_img'].host
 
@@ -310,12 +317,14 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
         self.cachestream = cuda.Stream()
+        self.outstream = cuda.Stream()
         # Create a CUDA events
         self.finishedMorpher = cuda.Event()
         self.finishedCombiner = cuda.Event()
         self.finishedCombinerCache = cuda.Event()
         self.finishedCache = cuda.Event()
-        self.finishedTHA = cuda.Event()
+        self.finishedFetch = cuda.Event()
+        self.finishedExec = cuda.Event()
     
     def setImage(self, img:np.ndarray):
         assert(len(img.shape) == 3 and 
@@ -341,6 +350,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         combiner_cached = self.cache.get(combiner_hash)
 
         self.cachestream.synchronize()
+        self.outstream.synchronize()
         if(morpher_cached is not None):
             self.hits += 1
             self.cache.move_to_end(morpher_hash)
@@ -350,6 +360,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             self.memories['face_morphed_half'].htod(self.instream)
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
         elif(combiner_cached is not None):
             self.hits += 1
             self.cache.move_to_end(combiner_hash)
@@ -369,6 +380,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             #Execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
 
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedMorpher)
@@ -404,6 +416,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             #execute the rest
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
+            self.finishedExec.record(self.instream)
             
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedCombiner)
@@ -433,11 +446,13 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
                 poped = self.cache.popitem(last=False)
                 self.cached_kbytes -= poped[1][2]
 
-        self.memories['output_cv_img'].dtoh(self.instream)
-        self.finishedTHA.record(self.instream)
+        self.outstream.wait_for_event(self.finishedExec)
+        self.memories['output_cv_img'].dtoh(self.outstream)
+        self.finishedFetch.record(self.outstream)
         self.returned = False
+        
         if return_now:
-            self.finishedTHA.synchronize()
+            self.finishedFetch.synchronize()
             self.returned = True
             return self.memories['output_cv_img'].host
         else:
@@ -445,6 +460,6 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
     def fetchRes(self)->np.ndarray:
         if self.returned == True:
             raise ValueError('Already fetched result')
-        self.finishedTHA.synchronize()
+        self.finishedFetch.synchronize()
         self.returned = True
         return self.memories['output_cv_img'].host
