@@ -8,7 +8,7 @@ Windows only, Linux may work if you can figure out environment.
 
 仅Windows
 ### Graphic Card
-Supporting DirectML for AMD and Intel GPU, cuda/TensorRT accelerate for Nvidia. TensorRT supports Nvidia Turing microarchitecture graphic cards and above. Any gaming card higher than GeForce 16/20 series. For example all my tests are done on a GTX1660SUPER without any issue. Better gpu would give higher framerate, allow using higher percision model, and lower resource consumption.
+Supporting DirectML for AMD and Intel GPU, cuda/TensorRT accelerate for Nvidia. DML implementation does not have good support on memory management due to ORT Python limitation.TensorRT supports Nvidia Turing microarchitecture graphic cards and above. Any gaming card higher than GeForce 16/20 series can get benefit from TensorRT and have advance memory management through PyCuda. For example all my tests are done on a GTX1660SUPER without any issue. Better gpu would give higher framerate, allow using higher percision model, and lower resource consumption.
 
 A卡I卡使用DirectML, 有性能但不多，而且python的ort接口无法避免跨设备拷贝有性能损失。n卡可使用cuda或Tensorrt。TensorRT加速支持16和20系以上的英伟达显卡，配合cuda接口性能有跨越式提升，更好的显卡可以输出更高原生帧率，使用精度更高的模型和更少的系统占用。
 ## Key Improvements
@@ -22,6 +22,17 @@ Made static ONNX format model from THA3 and RIFE's prior dynamic PyTorch impleme
 Powered by Nvidia TensorRT which unlocks the full computation potential of the GPU and acelerates using FP16, BF16, and TF32.
 
 使用TenosorRT框架进行推理，可使用多种精度进行加速。
+
+### DirectML
+Currently supporting AMD and Intel GPU by DirectML execution provider of OnnxRuntime. Due to Python API limitation, this method is not well optimized.
+
+A卡和I卡使用OnnxRuntime 提供的DirectML支持，可用但因为Python接口不完善有诸多限制，此实现并非本项目主要实现方向，仅提供入门支持，请自行斟酌。
+
+### Cache
+Updated cache structure, provide VRAM+RAM+DiskDatabase solutions for caching results effectively lower down GPU resource comsumption.
+
+实现显存，内存，和硬盘数据库等各式缓存方式供选择，有效减少gpu计算和显存占用
+
 
 ### RIFE
 Introduced RIFE model to perform frame interpolation between 2 native frame comes out from THA. Resource consumption of RIFE is significantly less than THA. Just to noticed frame interpolation would bring system delay as a tradeoff. Provided up x4 times interpolation. This feature is crucial for low-end gpus like my 1660s. Limited by RIFE, interpolation up to x4 times, which brings 10fps native frame gen to 40fps experience.
