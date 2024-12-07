@@ -71,6 +71,12 @@ class THACore:
         self.editor.setInputMems(editor_inputs)
         editor_outputs = [self.memories['output_img'], self.memories['output_cv_img']]
         self.editor.setOutputMems(editor_outputs)
+    def setImage(self, img:np.ndarray):
+        raise ValueError('No provided implementation')
+    def inference(self, pose:np.ndarray, return_now:bool) -> np.ndarray:
+        raise ValueError('No provided implementation')
+    def fetchRes(self)->np.ndarray:
+        raise ValueError('No provided implementation')
 
 
 class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just for benchmarking tha's performance on given platform

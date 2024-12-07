@@ -2,15 +2,14 @@ import sys
 import os
 sys.path.append(os.getcwd())
 from ezvtb_rt.trt_utils import *
-from os.path import join
-from ezvtb_rt.engine import Engine, createMemory
-from ezvtb_rt.rife import RIFECore
+from ezvtb_rt.rife import RIFECore, RIFECoreLinked
 from ezvtb_rt.tha import THACore
+from ezvtb_rt.cache import Cacher
 
 class Core():
-    def __init__(self, tha_model_dir, rift_model_dir):
+    def __init__(self, tha_model_dir:str, rift_model_dir:str):
         self.tha = THACore(tha_model_dir)
-        self.rife = RIFECore(rift_model_dir, scale = -1, latest_frame=self.tha.memories['output_cv_img'])
+        self.rife = RIFECore(rift_model_dir, latest_frame=self.tha.memories['output_cv_img'])
         
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
@@ -63,3 +62,24 @@ class Core():
         for i in range(self.rife.scale):
             ret.append(self.rife.memories['framegen_'+str(i)].host)
         return ret
+
+class CoreCached():
+    def __init__(self, cached_tha_core:THACore, cacher:Cacher, rife_core:RIFECoreLinked):
+        self.tha = cached_tha_core
+        self.cacher = cacher
+        self.rife = rife_core
+    def setImage(self, img:np.ndarray):
+        self.tha.setImage(img)
+    def inference(self, pose:np.ndarray) -> List[np.ndarray]:
+        if self.cacher is None: #Optional to disable cacher
+            self.tha.inference(pose, False)
+            return self.rife.inference(True)
+
+        hs = hash(str(pose))
+        cached = self.cacher.read(hs)
+        if cached is None:
+            self.tha.inference(pose, False)
+            self.rife.inference(False)
+        else:
+            pass
+        self.rife.inference(False)
