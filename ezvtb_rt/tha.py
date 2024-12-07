@@ -157,9 +157,6 @@ class VRAMCacher(object):
             self.miss += 1
             return None
     def write_mem_set(self, hs:int)->set[VRAMMem, VRAMMem]:
-        cached = self.cache.get(hs)
-        if cached is not None:
-            raise ValueError('Should not write to vram cacher with existing hash')
         if len(self.pool) != 0:
             mem_set = self.pool.pop()
         else:
@@ -172,10 +169,10 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         super().__init__(model_dir)
         self.combiner_cacher = VRAMCacher(self.memories['eyebrow_image'].host.nbytes, 
                                           self.memories['morpher_decoded'].host.nbytes, 
-                                          0.3 * vram_cache_size)
+                                          0.1 * vram_cache_size)
         self.morpher_cacher = VRAMCacher(self.memories['face_morphed_full'].host.nbytes,
                                          self.memories['face_morphed_half'].host.nbytes,
-                                         0.7 * vram_cache_size)
+                                         0.9 * vram_cache_size)
         self.returned = False
         # create stream
         self.updatestream = cuda.Stream()
@@ -299,8 +296,8 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         self.cache = OrderedDict()
         self.cached_kbytes = 0
         self.max_cached_kbytes = int(ram_cache_size * 1024 * 1024)
-        self.morpher_cache_size = (self.memories['face_morphed_full'].host.nbytes + self.memories['face_morphed_half'].host.nbytes)//1024
-        self.combiner_cache_size = (self.memories['eyebrow_image'].host.nbytes + self.memories['morpher_decoded'].host.nbytes)//1024
+        self.morpher_cache_kbytes = (self.memories['face_morphed_full'].host.nbytes + self.memories['face_morphed_half'].host.nbytes)//1024
+        self.combiner_cache_kbytes = (self.memories['eyebrow_image'].host.nbytes + self.memories['morpher_decoded'].host.nbytes)//1024
         self.hits = 0
         self.miss = 0
         # create stream
@@ -347,12 +344,11 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             self.memories['face_morphed_half'].htod(self.instream)
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
         elif(combiner_cached is not None):
             self.hits += 1
             self.cache.move_to_end(combiner_hash)
             #prepare input
-            np.copyto(self.memories['morpher_decoded'].host, combiner_cached[0])
+            np.copyto(self.memories['eyebrow_image'].host, combiner_cached[0])
             self.memories['eyebrow_image'].htod(self.instream)
             np.copyto(self.memories['morpher_decoded'].host, combiner_cached[1])
             self.memories['morpher_decoded'].htod(self.instream)
@@ -363,25 +359,23 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             #Execute morpher
             self.morpher.exec(self.instream)
             self.finishedMorpher.record(self.instream)
+            
+            #Execute the rest
+            self.rotator.exec(self.instream)
+            self.editor.exec(self.instream)
 
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedMorpher)
             self.memories['face_morphed_full'].dtoh(self.cachestream)
             self.memories['face_morphed_half'].dtoh(self.cachestream)
             self.finishedCache.record(self.cachestream)
-            
-            #Execute the rest
-            self.rotator.exec(self.instream)
-            self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
-            self.finishedTHA.record(self.instream)
 
             #save morpher cache
             self.finishedCache.synchronize()
             self.cache[morpher_hash] = (self.memories['face_morphed_full'].host.copy(), 
                                         self.memories['face_morphed_half'].host.copy(), 
-                                        self.morpher_cache_size)
-            self.cached_kbytes += self.morpher_cache_size
+                                        self.morpher_cache_kbytes)
+            self.cached_kbytes += self.morpher_cache_kbytes
             while(self.cached_kbytes > self.max_cached_kbytes):
                 poped = self.cache.popitem(last=False)
                 self.cached_kbytes -= poped[1][2] 
@@ -397,44 +391,44 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             self.combiner.exec(self.instream)
             self.finishedCombiner.record(self.instream)
 
+            #execute morpher
+            self.morpher.exec(self.instream)
+            self.finishedMorpher.record(self.instream)
+            
+            #execute the rest
+            self.rotator.exec(self.instream)
+            self.editor.exec(self.instream)
+            
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedCombiner)
             self.memories['eyebrow_image'].dtoh(self.cachestream)
             self.memories['morpher_decoded'].dtoh(self.cachestream)
             self.finishedCombinerCache.record(self.cachestream)
-            
-            #execute morpher
-            self.morpher.exec(self.instream)
-            self.finishedMorpher.record(self.instream)
-            
+
             #cache morpher result
             self.cachestream.wait_for_event(self.finishedMorpher)
             self.memories['face_morphed_full'].dtoh(self.cachestream)
             self.memories['face_morphed_half'].dtoh(self.cachestream)
             self.finishedCache.record(self.cachestream)
-            
-            #execute the rest
-            self.rotator.exec(self.instream)
-            self.editor.exec(self.instream)
-            self.memories['output_cv_img'].dtoh(self.instream)
-            self.finishedTHA.record(self.instream)
 
             #save caches
             self.finishedCombinerCache.synchronize()
             self.cache[combiner_hash] = (self.memories['eyebrow_image'].host.copy(), 
                                          self.memories['morpher_decoded'].host.copy(), 
-                                         self.combiner_cache_size)
-            self.cached_kbytes += (self.combiner_cache_size)
+                                         self.combiner_cache_kbytes)
+            self.cached_kbytes += (self.combiner_cache_kbytes)
 
             self.finishedCache.synchronize()
             self.cache[morpher_hash] = (self.memories['face_morphed_full'].host.copy(), 
                                         self.memories['face_morphed_half'].host.copy(), 
-                                        self.morpher_cache_size)
-            self.cached_kbytes += self.morpher_cache_size
+                                        self.morpher_cache_kbytes)
+            self.cached_kbytes += self.morpher_cache_kbytes
             while(self.cached_kbytes > self.max_cached_kbytes):
                 poped = self.cache.popitem(last=False)
                 self.cached_kbytes -= poped[1][2]
 
+        self.memories['output_cv_img'].dtoh(self.instream)
+        self.finishedTHA.record(self.instream)
         self.returned = False
         if return_now:
             self.finishedTHA.synchronize()

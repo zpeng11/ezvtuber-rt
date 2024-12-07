@@ -113,9 +113,20 @@ def THACacheVRAMPerf():
     core.setImage(np.random.rand(512,512,4).astype(np.uint8))
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
-    for pose in tqdm(pose_data[:2000]):
+    for pose in tqdm(pose_data):
         ret = core.inference(np.array(pose).reshape(1,45),True).copy()
     print(core.combiner_cacher.hits, core.combiner_cacher.miss, core.morpher_cacher.hits, core.morpher_cacher.miss)
+    cuda.stop_profiler()
+
+def THACacheRAMPerf():
+    core = THACoreCachedRAM('./data/tha3/seperable/fp16', 2)
+    cuda.start_profiler()
+    core.setImage(np.random.rand(512,512,4).astype(np.uint8))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    for pose in tqdm(pose_data):
+        ret = core.inference(np.array(pose).reshape(1,45),True).copy()
+    print(core.hits, core.miss)
     cuda.stop_profiler()
 
 def THACacheVRAMShow():
@@ -140,10 +151,35 @@ def THACacheVRAMShow():
     generate_video(tha_res_cached, './test/data/tha/sepe16_vram.mp4', 20)
     print(core.combiner_cacher.hits, core.combiner_cacher.miss, core.morpher_cacher.hits, core.morpher_cacher.miss)
 
+def THACacheRAMShow():
+    core = THACoreCachedRAM('./data/tha3/seperable/fp16')
+    core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    tha_res = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45), True)
+        tha_res.append(img.copy()[:,:,:3])
+
+    tha_res_cached = []
+    for i, pose in enumerate(pose_data[800:1000]):
+        img = core.inference(np.array(pose).reshape(1,45), True)
+        tha_res_cached.append(img.copy()[:,:,:3])
+
+    mae = 0
+    for i in range(len(tha_res)):
+        mae += np.abs((tha_res[i] - tha_res_cached[i])).sum()
+    print('cache mae:',mae)
+    generate_video(tha_res_cached, './test/data/tha/sepe16_ram.mp4', 20)
+    print(core.hits, core.miss)
+
 if __name__ == "__main__":
     os.makedirs('./test/data/tha', exist_ok=True)
-    PCIECopyPerf()
-    THATestShow()
-    THATestPerf()
-    THACacheVRAMPerf()
-    THACacheVRAMShow()
+    # PCIECopyPerf()
+    # THATestShow()
+    # THATestPerf()
+    # THACacheVRAMPerf()
+    # THACacheVRAMShow()
+    THACacheRAMPerf()
+    # THACacheRAMShow()
+    
