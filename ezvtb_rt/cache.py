@@ -12,6 +12,7 @@ from multiprocessing import Process, Queue
 import multiprocessing as mp
 import queue
 import turbojpeg
+import time
 
 class Cacher(ABC):
     #Input and outputs are in shape(512, 512, 4), however due to turbojpeg usage, the alpha channel might be inaccurate
@@ -23,7 +24,8 @@ class Cacher(ABC):
 
 class RAMCacher(Cacher):
     def __init__(self, max_size:int, quality:int = 90): #Size in GBs
-        self.max_size = max_size
+        self.max_kbytes = max_size * 1024 * 1024
+        self.cached_kbytes = 0
         self.cache = OrderedDict()
         self.hits = 0
         self.miss = 0
@@ -33,16 +35,29 @@ class RAMCacher(Cacher):
         if cached is not None:
             self.hits += 1
             self.cache.move_to_end(hs)
-            res = turbojpeg.decompress(cached, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
-            img = np.ndarray((512,512,4), dtype=np.uint8, buffer=res)
+            if self.quality == 100:
+                img = cached
+            else:
+                res = turbojpeg.decompress(cached, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
+                img = np.ndarray((512,512,4), dtype=np.uint8, buffer=res)
             return img
         else:
             self.miss += 1
             return None
-    def write(self, hs:int, data:np.ndarray) -> tuple[int, np.ndarray]:
-        self.cache[hs] = turbojpeg.compress(data, self.quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
-        if len(self.cache) * len(self.cache[hs]) > self.max_size * 1024 * 1024 * 1024:
-            return self.cache.popitem(last=False)
+    def write(self, hs:int, data:np.ndarray):
+        if self.quality == 100:
+            self.cache[hs] = data
+            self.cached_kbytes += data.nbytes /1024
+            while self.cached_kbytes > self.max_kbytes:
+                poped = self.cache.popitem(last=False)
+                self.cached_kbytes -= poped[1].nbytes/1024
+        else:
+            compressed = turbojpeg.compress(data, self.quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
+            self.cache[hs] = compressed
+            self.cached_kbytes += len(compressed) /1024
+            while self.cached_kbytes > self.max_kbytes:
+                poped = self.cache.popitem(last=False)
+                self.cached_kbytes -= len(poped[1])/1024
 
 
 
@@ -93,17 +108,16 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
         return conn
                 
 
-class WriterProcess(Process): # A seperate process that write input from database, run in another process to avoid potential block in sqlite operation
-    def __init__(self, write_queue:Queue, db_path:str, max_size:int, cache_quality:int = 90):
+class WriterProcess(Process): # A seperate process that write input to database, run in another process to avoid potential block in sqlite operation
+    def __init__(self, write_queue:Queue, db_path:str, cache_quality:int = 90):
         super(WriterProcess, self).__init__()
         self.write_queue = write_queue
         self.db_path = db_path
-        self.max_size = max_size
         self.cache_quality = cache_quality
 
     def run(self):
         assert(os.path.isfile(self.db_path)) # Must already exist
-        self.conn = self.db_for_write(self.db_path, self.max_size)
+        self.conn = self.db_for_write(self.db_path)
         print('Writer start runing')
         while True:
             try:
@@ -115,14 +129,14 @@ class WriterProcess(Process): # A seperate process that write input from databas
                 print('Writer get ending signal')
                 break
             hs = res[0]
-            cache_bytes = turbojpeg.compress(res[1], self.cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
+            cache_bytes = turbojpeg.compress(res[1], self.cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize=True, pixelformat=turbojpeg.BGRA)
             self.conn.execute('INSERT OR IGNORE INTO cache(hash, bytes) VALUES (?, ?)',(hs, cache_bytes))
             self.conn.commit()
         self.conn.close()
         print('Writer closed db')
         exit()
 
-    def db_for_write(self, db_path:str, max_size:int):
+    def db_for_write(self, db_path:str):
         conn = sqlite3.connect(db_path)
         conn.execute('PRAGMA journal_mode = wal;')
         conn.execute('PRAGMA synchronous = normal;')
@@ -144,7 +158,7 @@ class DBCacherMP(Cacher):
         ready = self.read_return.get(timeout=1.0)
         assert(ready in 'ready')
         self.write_queue = Queue()
-        self.writer = WriterProcess(self.write_queue, db_path, max_size, cache_quality)
+        self.writer = WriterProcess(self.write_queue, db_path, cache_quality)
         self.writer.start()
         self.hits = 0
         self.miss = 0
@@ -174,7 +188,6 @@ class DBCacherMP(Cacher):
     def close(self):
         self.read_trigger.put_nowait(None)
         self.write_queue.put_nowait(None)
-        import time
         time.sleep(1)
         self.write_queue.close()
         self.read_return.close()
