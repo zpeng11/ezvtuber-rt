@@ -95,10 +95,6 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
         exit()
 
     def create_db_for_read(self, db_path:str, max_size:int):
-        try:
-            os.remove(db_path)
-        except OSError:
-            pass
         conn = sqlite3.connect(db_path)
         conn.execute('PRAGMA journal_mode = wal;')
         conn.execute('PRAGMA synchronous = normal;')
@@ -108,6 +104,7 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
         conn.execute(f'PRAGMA cache_size = -{str(1024 * 1024 * max_size/2)};')
         # Create the table
         conn.execute('CREATE TABLE IF NOT EXISTS cache( hash INTEGER PRIMARY KEY, bytes BLOB NOT NULL);')
+        print('Existing entries:',conn.execute('SELECT count(*) from cache').fetchone()[0])
         return conn
                 
 

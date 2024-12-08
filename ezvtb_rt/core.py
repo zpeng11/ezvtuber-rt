@@ -78,7 +78,7 @@ class CoreCached():
             else:
                 return [self.tha.inference(pose,True)]
 
-        hs = hash(str(pose))
+        hs = hash(frozenset(pose.flatten()))
 
         if self.continual_cache_counter > 10: # continues hits for too long time
             if self.rife is not None:

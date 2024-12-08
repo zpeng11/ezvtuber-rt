@@ -41,7 +41,7 @@ class CoreORTCached:
                 tha_res = self.tha.inference(pose.astype(np.float32))
                 return self.rife.inference(tha_res)
         else:
-            hs = hash(str(pose))
+            hs = hash(frozenset(pose.flatten()))
             if self.continual_cache_counter > 10:
                 self.continual_cache_counter = 0
                 if self.rife is None:
