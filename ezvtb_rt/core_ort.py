@@ -1,6 +1,3 @@
-import sys
-import os
-sys.path.append(os.getcwd())
 from typing import List
 
 import numpy as np

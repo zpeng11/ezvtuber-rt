@@ -1,16 +1,16 @@
-import argparse
 from pathlib import Path
-import sys
 import os
 import numpy as np
 import tensorrt as trt
-from typing import List, Tuple
+from typing import List
 import pycuda.driver as cuda
 import pycuda
 from os.path import join
 import numpy
 
 TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+
+support_tf32 = None #TODO use to record if tf32 is supported on this device
 
 def build_engine(onnx_file_path, precision:str):
     builder = trt.Builder(TRT_LOGGER)
@@ -37,8 +37,6 @@ def build_engine(onnx_file_path, precision:str):
         pass
     elif precision == 'fp16':
         config.set_flag(trt.BuilderFlag.FP16)
-    elif precision == 'int8':
-        config.set_flag(trt.BuilderFlag.INT8)
     else:
         raise ValueError('precision must be one of fp32 or fp16')
         # Build engine.

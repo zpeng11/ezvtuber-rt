@@ -6,7 +6,7 @@ from ezvtb_rt.core_ort import CoreORT, CoreORTCached
 import numpy as np
 from typing import List, Tuple
 from tqdm import tqdm
-from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy, generate_video, thaimg_to_cvimg
+from ezvtb_rt.cv_utils import generate_video
 from ezvtb_rt.cache import RAMCacher, DBCacherMP
 import json
 import cv2

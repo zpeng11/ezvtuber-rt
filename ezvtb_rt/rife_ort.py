@@ -1,9 +1,4 @@
-import sys
-import os
-sys.path.append(os.getcwd())
 import onnxruntime as ort
-import onnx
-from typing import List
 import numpy as np
 
 class RIFEORTCore:

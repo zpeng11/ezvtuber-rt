@@ -1,6 +1,3 @@
-import sys
-import os
-sys.path.append(os.getcwd())
 from ezvtb_rt.trt_utils import *
 from ezvtb_rt.rife import RIFECore, RIFECoreLinked
 from ezvtb_rt.tha import THACore

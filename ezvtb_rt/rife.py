@@ -1,8 +1,5 @@
-import sys
 import os
-sys.path.append(os.getcwd())
 from ezvtb_rt.trt_utils import *
-from os.path import join
 from ezvtb_rt.engine import Engine, createMemory
 from ezvtb_rt.tha import THACore
 

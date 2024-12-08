@@ -1,9 +1,6 @@
-import sys
 import os
-sys.path.append(os.getcwd())
 import onnxruntime as ort
 import onnx
-from typing import List
 import numpy as np
 
 def merge_graph_all(tha_dir:str, seperable:bool):

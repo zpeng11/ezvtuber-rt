@@ -1,6 +1,4 @@
-import sys
 import os
-sys.path.append(os.getcwd())
 from typing import Set
 import cv2
 import sqlite3
@@ -47,7 +45,7 @@ class RAMCacher(Cacher):
             return None
     def write(self, hs:int, data:np.ndarray):
         if self.quality == 100:
-            self.cache[hs] = data
+            self.cache[hs] = data.copy()
             self.cached_kbytes += data.nbytes /1024
             while self.cached_kbytes > self.max_kbytes:
                 poped = self.cache.popitem(last=False)

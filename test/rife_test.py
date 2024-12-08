@@ -7,9 +7,8 @@ from ezvtb_rt.tha import THACoreSimple, THACore
 import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
-from typing import List, Tuple
 from tqdm import tqdm
-from ezvtb_rt.cv_utils import numpy_to_image_file, img_file_to_numpy, generate_video, thaimg_to_cvimg
+from ezvtb_rt.cv_utils import generate_video
 import json
 import cv2
 
