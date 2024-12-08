@@ -64,22 +64,60 @@ class Core():
         return ret
 
 class CoreCached():
-    def __init__(self, cached_tha_core:THACore, cacher:Cacher, rife_core:RIFECoreLinked):
+    def __init__(self, cached_tha_core:THACore, cacher:Cacher = None, rife_core:RIFECoreLinked = None):
         self.tha = cached_tha_core
         self.cacher = cacher
         self.rife = rife_core
+        self.continual_cache_counter = 0 #Because when image cache happens, we only use the bgr channels, but use old alpha, 
+                                         #which means we need to prevent cacher from continues cache hits
     def setImage(self, img:np.ndarray):
         self.tha.setImage(img)
-    def inference(self, pose:np.ndarray) -> List[np.ndarray]:
+
+    def inference(self, pose:np.ndarray) -> List[np.ndarray]: #This numpy object should be copyed/used before next inference cycle
         if self.cacher is None: #Optional to disable cacher
-            self.tha.inference(pose, False)
-            return self.rife.inference(True)
+            if self.rife is not None:
+                self.tha.inference(pose, False)
+                return self.rife.inference(True)
+            else:
+                return [self.tha.inference(pose,True)]
 
         hs = hash(str(pose))
+
+        if self.continual_cache_counter > 10: # continues hits for too long time
+            if self.rife is not None:
+                self.continual_cache_counter = 0
+                self.tha.inference(pose, False)
+                self.rife.inference(False)
+                tha_res = self.tha.fetchRes()
+                self.cacher.write(hs, tha_res)
+                return self.rife.fetchRes()
+            else:
+                self.continual_cache_counter = 0
+                tha_res = self.tha.inference(pose, True)
+                self.cacher.write(hs, tha_res)
+                return [tha_res]
+
         cached = self.cacher.read(hs)
+
+        if self.rife is None: #optional to disable rife
+            if cached is None:
+                self.continual_cache_counter = 0
+                tha_res = self.tha.inference(pose, True)
+                self.cacher.write(hs, tha_res)
+                return [tha_res]
+            else:
+                self.continual_cache_counter += 0
+                return cached           
+
         if cached is None:
+            self.continual_cache_counter = 0
             self.tha.inference(pose, False)
             self.rife.inference(False)
+            tha_res = self.tha.fetchRes()
+            self.cacher.write(hs, tha_res)
+            return self.rife.fetchRes()
         else:
-            pass
-        self.rife.inference(False)
+            self.continual_cache_counter += 1
+            self.rife.memories['latest_frame'].host[:,:,:3] = cached[:,:,:3]
+            self.rife.memories['latest_frame'].htod(self.rife.instream)
+            return self.rife.inference(True)

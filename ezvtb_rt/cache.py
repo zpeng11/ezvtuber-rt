@@ -23,7 +23,7 @@ class Cacher(ABC):
     
 
 class RAMCacher(Cacher):
-    def __init__(self, max_size:int, quality:int = 90, siz:int = 512): #Size in GBs
+    def __init__(self, max_size:int = 2, quality:int = 90, siz:int = 512): #Size in GBs
         self.max_kbytes = max_size * 1024 * 1024
         self.cached_kbytes = 0
         self.cache = OrderedDict()
@@ -97,6 +97,10 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
         exit()
 
     def create_db_for_read(self, db_path:str, max_size:int):
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
         conn = sqlite3.connect(db_path)
         conn.execute('PRAGMA journal_mode = wal;')
         conn.execute('PRAGMA synchronous = normal;')
@@ -184,7 +188,7 @@ class DBCacherMP(Cacher):
             return None
 
     def write(self, hs:int, data:np.ndarray):
-        self.write_queue.put_nowait((hs, data))
+        self.write_queue.put_nowait((hs, data.copy()))
 
     def close(self):
         self.read_trigger.put_nowait(None)

@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 from ezvtb_rt.trt_utils import *
 from os.path import join
 from ezvtb_rt.engine import Engine, createMemory
+from ezvtb_rt.tha import THACore
 
 class RIFECore:
     def __init__(self, model_dir:str, latest_frame:HostDeviceMem = None):
@@ -82,9 +83,9 @@ class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, ju
         return ret
     
 class RIFECoreLinked(RIFECore):
-    def __init__(self, model_dir, latest_frame:HostDeviceMem, inStream:cuda.Stream):
-        super().__init__(model_dir, latest_frame)
-        self.instream = inStream
+    def __init__(self, model_dir, tha_core:THACore):
+        super().__init__(model_dir, tha_core.memories['output_cv_img'])
+        self.instream = tha_core.instream
         self.copystream = cuda.Stream() 
         self.finishedCopy = cuda.Event()
         self.finishedExec = cuda.Event()
