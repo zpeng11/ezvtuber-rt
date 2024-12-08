@@ -21,8 +21,7 @@ def createMemory(nodeInfo : NodeInfo):
 class Engine:
     def __init__(self, model_dir:str, model_component:str, n_inputs:int):
         TRT_LOGGER.log(TRT_LOGGER.WARNING, f'Loading engine from file {join(model_dir, model_component)}')
-        dtype = 'fp32' if 'fp32' in model_dir or 'fp32' in model_component else 'fp16'
-        self.engine = get_trt_engine(model_dir, model_component, dtype)
+        self.engine = get_trt_engine(model_dir, model_component)
         assert(self.engine is not None)
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Completed loading engine')
 

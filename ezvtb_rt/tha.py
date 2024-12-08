@@ -9,13 +9,13 @@ class THACore:
         self.prepareMemories()
         self.setMemsToEngines()
 
-    def prepareEngines(self, model_dir, engineT = Engine): #inherit and pass different engine type
+    def prepareEngines(self, model_dir):
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating Engines')
-        self.decomposer = engineT(model_dir, 'decomposer', 1)
-        self.combiner = engineT(model_dir, 'combiner', 4)
-        self.morpher = engineT(model_dir, 'morpher', 4)
-        self.rotator = engineT(model_dir, 'rotator', 2)
-        self.editor = engineT(model_dir, 'editor', 4)
+        self.decomposer = Engine(model_dir, 'decomposer', 1)
+        self.combiner = Engine(model_dir, 'combiner', 4)
+        self.morpher = Engine(model_dir, 'morpher', 4)
+        self.rotator = Engine(model_dir, 'rotator', 2)
+        self.editor = Engine(model_dir, 'editor', 4)
 
     def prepareMemories(self):
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating memories on VRAM')

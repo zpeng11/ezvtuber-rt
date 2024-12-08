@@ -4,15 +4,85 @@ import numpy as np
 import tensorrt as trt
 from typing import List
 import pycuda.driver as cuda
-import pycuda
 from os.path import join
 import numpy
+from tqdm import tqdm
+import onnx
 
 TRT_LOGGER = trt.Logger(trt.Logger.INFO)
 
-support_tf32 = None #TODO use to record if tf32 is supported on this device
+# Solution from https://github.com/NVIDIA/TensorRT/issues/1050#issuecomment-775019583
+from ctypes import cdll, c_char_p
+libcudart = cdll.LoadLibrary('cudart64_12.dll')
+libcudart.cudaGetErrorString.restype = c_char_p
+def cudaSetDevice(device_idx):
+    ret = libcudart.cudaSetDevice(device_idx)
+    if ret != 0:
+        error_string = libcudart.cudaGetErrorString(ret)
+        raise RuntimeError("cudaSetDevice: " + error_string)
 
-def build_engine(onnx_file_path, precision:str):
+def check_exist_all_models():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    data_dir = os.path.join(dir_path, '..','data')
+    rife_types = ['x2','x3','x4']
+    rife_dtypes = ['fp32','fp16']
+    rife_list = []
+    for rife_type in rife_types:
+        for rife_dtype in rife_dtypes:
+            onnx_file = os.path.join(data_dir, 'rife_lite_v4_25',rife_type, rife_dtype+'.onnx')
+            if not os.path.isfile(onnx_file):
+                raise ValueError('Data is not prepared')
+            onnx.checker.check_model(onnx_file)
+            rife_list.append(onnx_file)
+    tha_types = ['seperable', 'standard']
+    tha_dtypes = ['fp32', 'fp16']
+    tha_components = ['combiner.onnx', 'decomposer.onnx','editor.onnx', 'morpher.onnx', 'rotator.onnx']
+    tha_list = []
+    for tha_type in tha_types:
+        for tha_dtype in tha_dtypes:
+            for tha_component in tha_components:
+                onnx_file = os.path.join(data_dir, 'tha3', tha_type, tha_dtype, tha_component)
+                if not os.path.isfile(onnx_file):
+                    raise ValueError('Data is not prepared')
+                onnx.checker.check_model(onnx_file)
+                tha_list.append(onnx_file)
+    return rife_list + tha_list
+
+def check_build_all_models() -> bool:
+    all_models_list = check_exist_all_models()
+    #Check TRT support
+    ret = build_engine(all_models_list[0], 'fp32', False)
+    if ret is None:
+        print('This device does not support tensorrt!')
+        return False
+    #check tf32
+    ret = build_engine(all_models_list[0], 'fp32', False)
+    tf32 = False
+    if ret is None:
+        print('This device does not support tf32, use fp32 for full percision!')
+        tf32 = True
+    print('Building for models...')
+    for fullpath in tqdm(all_models_list):
+        dir, filename = os.path.split(fullpath)
+        trt_filename = filename.split('.')[0] + '.trt'
+        trt_fullpath = os.path.join(dir, trt_filename)
+        if os.path.isfile(trt_fullpath):
+            try:
+                if load_engine(trt_fullpath) is not None:
+                    continue
+                else:
+                    print(f'Can not successfully load {trt_fullpath}, build again')
+            except:
+                print(f'Loading {trt_fullpath} failed, building agian')
+        dtype = 'fp16' if 'fp16' in dir else 'fp32'
+        engine_seri = build_engine(fullpath, dtype, tf32)
+        if engine_seri is None:
+            raise ValueError(f'TRT build for {dir} failed, please check model')
+        save_engine(engine_seri, trt_fullpath)
+    return True
+
+
+def build_engine(onnx_file_path:str, precision:str, tf32:bool= False):
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     config = builder.create_builder_config()
@@ -34,7 +104,10 @@ def build_engine(onnx_file_path, precision:str):
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, GiB(1)) # 1G
     
     if precision == 'fp32':
-        pass
+        if tf32:
+            config.set_flag(trt.BuilderFlag.TF32)
+        else:
+            pass
     elif precision == 'fp16':
         config.set_flag(trt.BuilderFlag.FP16)
     else:
@@ -62,7 +135,7 @@ def load_engine(path):
 
 #memory management
 class HostDeviceMem(object):
-    def __init__(self, host_mem:numpy.ndarray, device_mem: pycuda.driver.DeviceAllocation):
+    def __init__(self, host_mem:numpy.ndarray, device_mem: cuda.DeviceAllocation):
         self.host = host_mem
         self.device = device_mem
 
@@ -73,9 +146,9 @@ class HostDeviceMem(object):
         return self.__str__()
     def __del__(self):
         self.device.free()
-    def dtoh(self, stream:pycuda.driver.Stream):
+    def dtoh(self, stream:cuda.Stream):
         cuda.memcpy_dtoh_async(self.host, self.device, stream) 
-    def htod(self, stream:pycuda.driver.Stream):
+    def htod(self, stream:cuda.Stream):
         cuda.memcpy_htod_async(self.device, self.host, stream)
 
 class Processor:
@@ -173,12 +246,10 @@ class Processor:
         
         return [np.copy(outp.host) for outp in self.outputs]
     
-def get_trt_engine(model_dir:str, component:str, dtype:str = 'fp16'):
+def get_trt_engine(model_dir:str, component:str):
     trt_filename = join(model_dir, component+'.trt')
-    onnx_filename = join(model_dir, component+'.onnx')
-    if not os.path.exists(trt_filename):
-        assert(os.path.exists(onnx_filename))
-        engine_seri = build_engine(onnx_filename, dtype)
-        save_engine(engine_seri, trt_filename)
-    return load_engine(trt_filename)
+    if os.path.isfile(trt_filename):
+        return load_engine(trt_filename)
+    else:
+        raise ValueError(f'TRT has not built for {trt_filename}, call check_build_all_models() first')
 
