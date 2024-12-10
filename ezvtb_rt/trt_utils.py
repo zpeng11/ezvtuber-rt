@@ -51,16 +51,10 @@ def check_exist_all_models():
 def check_build_all_models() -> bool:
     all_models_list = check_exist_all_models()
     #Check TRT support
-    ret = build_engine(all_models_list[0], 'fp32', False)
+    ret = build_engine(all_models_list[0], 'fp32')
     if ret is None:
         print('This device does not support tensorrt!')
         return False
-    #check tf32
-    ret = build_engine(all_models_list[0], 'fp32', False)
-    tf32 = False
-    if ret is None:
-        print('This device does not support tf32, use fp32 for full percision!')
-        tf32 = True
     print('Building for models...')
     for fullpath in tqdm(all_models_list):
         dir, filename = os.path.split(fullpath)
@@ -75,14 +69,14 @@ def check_build_all_models() -> bool:
             except:
                 print(f'Loading {trt_fullpath} failed, building agian')
         dtype = 'fp16' if 'fp16' in dir else 'fp32'
-        engine_seri = build_engine(fullpath, dtype, tf32)
+        engine_seri = build_engine(fullpath, dtype)
         if engine_seri is None:
             raise ValueError(f'TRT build for {dir} failed, please check model')
         save_engine(engine_seri, trt_fullpath)
     return True
 
 
-def build_engine(onnx_file_path:str, precision:str, tf32:bool= False):
+def build_engine(onnx_file_path:str, precision:str):
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
     config = builder.create_builder_config()
@@ -104,10 +98,7 @@ def build_engine(onnx_file_path:str, precision:str, tf32:bool= False):
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, GiB(1)) # 1G
     
     if precision == 'fp32':
-        if tf32:
-            config.set_flag(trt.BuilderFlag.TF32)
-        else:
-            pass
+        config.set_flag(trt.BuilderFlag.TF32)
     elif precision == 'fp16':
         config.set_flag(trt.BuilderFlag.FP16)
     else:
