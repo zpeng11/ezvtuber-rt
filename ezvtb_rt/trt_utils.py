@@ -7,51 +7,28 @@ import pycuda.driver as cuda
 from os.path import join
 import numpy
 from tqdm import tqdm
-import onnx
+from ezvtb_rt.init_utils import check_exist_all_models
 
 TRT_LOGGER = trt.Logger(trt.Logger.INFO)
 
 # Solution from https://github.com/NVIDIA/TensorRT/issues/1050#issuecomment-775019583
-from ctypes import cdll, c_char_p
-libcudart = cdll.LoadLibrary('cudart64_12.dll')
-libcudart.cudaGetErrorString.restype = c_char_p
 def cudaSetDevice(device_idx):
+    from ctypes import cdll, c_char_p
+    libcudart = cdll.LoadLibrary('cudart64_12.dll')
+    libcudart.cudaGetErrorString.restype = c_char_p
     ret = libcudart.cudaSetDevice(device_idx)
     if ret != 0:
         error_string = libcudart.cudaGetErrorString(ret)
-        raise RuntimeError("cudaSetDevice: " + error_string)
-
-def check_exist_all_models():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(dir_path, '..','data')
-    rife_types = ['x2','x3','x4']
-    rife_dtypes = ['fp32','fp16']
-    rife_list = []
-    for rife_type in rife_types:
-        for rife_dtype in rife_dtypes:
-            onnx_file = os.path.join(data_dir, 'rife_lite_v4_25',rife_type, rife_dtype+'.onnx')
-            if not os.path.isfile(onnx_file):
-                raise ValueError('Data is not prepared')
-            onnx.checker.check_model(onnx_file)
-            rife_list.append(onnx_file)
-    tha_types = ['seperable', 'standard']
-    tha_dtypes = ['fp32', 'fp16']
-    tha_components = ['combiner.onnx', 'decomposer.onnx','editor.onnx', 'morpher.onnx', 'rotator.onnx']
-    tha_list = []
-    for tha_type in tha_types:
-        for tha_dtype in tha_dtypes:
-            for tha_component in tha_components:
-                onnx_file = os.path.join(data_dir, 'tha3', tha_type, tha_dtype, tha_component)
-                if not os.path.isfile(onnx_file):
-                    raise ValueError('Data is not prepared')
-                onnx.checker.check_model(onnx_file)
-                tha_list.append(onnx_file)
-    return rife_list + tha_list
+        raise RuntimeError("cudaSetDevice: " + str(error_string))
 
 def check_build_all_models() -> bool:
     all_models_list = check_exist_all_models()
     #Check TRT support
-    ret = build_engine(all_models_list[0], 'fp32')
+    try:
+        ret = build_engine(all_models_list[0], 'fp32')
+    except:
+        print('This device does not support tensorrt!')
+        return False
     if ret is None:
         print('This device does not support tensorrt!')
         return False
