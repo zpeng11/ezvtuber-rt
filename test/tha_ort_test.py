@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.getcwd())
 from ezvtb_rt.tha_ort import THAORTCore, THAORTCoreNonDefault
+from ezvtb_rt.trt_utils import check_build_all_models
 import cv2
 from tqdm import tqdm
 import numpy as np
@@ -171,6 +172,7 @@ def THAORTTestShow():
     generate_video(tha_res, './test/data/tha_ort/stand32_dev1.mp4', 20)
 
 if __name__ == "__main__":
+    check_build_all_models()
     os.makedirs('./test/data/tha_ort', exist_ok=True)
     THAORTTestPerf()
     THAORTTestShow()

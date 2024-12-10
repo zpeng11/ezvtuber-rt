@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.getcwd())
-
+from ezvtb_rt.trt_utils import check_build_all_models
 from ezvtb_rt.core import Core, CoreCached
 from ezvtb_rt.cache import DBCacherMP, RAMCacher
 from ezvtb_rt.rife import RIFECoreLinked
@@ -261,6 +261,7 @@ def CoreCacheShow():
     print(core.cacher.hits, core.cacher.miss)
 
 if __name__ == "__main__":
+    check_build_all_models()
     os.makedirs('./test/data/core', exist_ok=True)
     CorePerf()
     CoreTestShow()

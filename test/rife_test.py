@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.getcwd())
-
+from ezvtb_rt.trt_utils import check_build_all_models
 from ezvtb_rt.rife import RIFECoreSimple, RIFECore
 from ezvtb_rt.tha import THACoreSimple, THACore
 import numpy as np
@@ -102,6 +102,7 @@ def RIFETestShow():
     generate_video(new_vid, './test/data/rife/halfx4.mp4', 40)
 
 if __name__ == "__main__":
+    check_build_all_models()
     os.makedirs('./test/data/rife', exist_ok=True)
     RIFETestPerf()
     RIFETestShow()

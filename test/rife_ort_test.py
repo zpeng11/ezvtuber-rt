@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.getcwd())
-
+from ezvtb_rt.trt_utils import check_build_all_models
 from ezvtb_rt.rife_ort import RIFEORTCore
 from ezvtb_rt.tha_ort import THAORTCore
 import numpy as np
@@ -97,6 +97,7 @@ def RIFEORTTestShow():
     generate_video(new_vid, './test/data/rife_ort/halfx4.mp4', 40)
 
 if __name__ == "__main__":
+    check_build_all_models()
     os.makedirs('./test/data/rife_ort', exist_ok=True)
     RIFEORTTestPerf()
     RIFEORTTestShow()

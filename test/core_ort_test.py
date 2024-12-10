@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.getcwd())
-
+from ezvtb_rt.trt_utils import check_build_all_models
 from ezvtb_rt.core_ort import CoreORT, CoreORTCached
 import numpy as np
 from typing import List, Tuple
@@ -239,6 +239,7 @@ def CoreORTCachedShow():
     generate_video(vid, './test/data/core_ort/cached_sepe_fp32_x3_fp32.mp4', 60)
 
 if __name__ == "__main__":
+    check_build_all_models()
     os.makedirs('./test/data/core_ort', exist_ok=True)
     CoreORTPerf()
     CoreORTTestShow()

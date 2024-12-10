@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.getcwd())
 from ezvtb_rt.cache import RAMCacher, DBCacherMP
+from ezvtb_rt.trt_utils import check_build_all_models
 import numpy  as np
 import cv2
 from tqdm import tqdm
@@ -38,6 +39,7 @@ def DBCacherTest():
         cv2.imwrite('./test/data/cache/db_cacher.jpg', cacher.read(0)[:,:,:3])
 
 if __name__ == '__main__':
+    check_build_all_models()
     os.makedirs('./test/data/cache', exist_ok=True)
     RAMCacherTest()
     DBCacherTest()
