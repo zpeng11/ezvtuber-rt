@@ -29,8 +29,6 @@ class CoreORTCached:
         else:
             self.rife = None
         self.cacher = cacher
-        self.continual_cache_counter = 0 #Because when image cache happens, we only use the bgr channels, but use old alpha, 
-                                         #which means we need to prevent cacher from continues cache hits
     def setImage(self, img:np.ndarray):
         self.tha.update_image(img)
     def inference(self, pose:np.ndarray) -> List[np.ndarray]:
@@ -42,25 +40,15 @@ class CoreORTCached:
                 return self.rife.inference(tha_res)
         else:
             hs = hash(frozenset(pose.flatten()))
-            if self.continual_cache_counter > 10:
-                self.continual_cache_counter = 0
-                if self.rife is None:
-                    tha_res = self.tha.inference(pose.astype(np.float32))
-                    self.cacher.write(hs, tha_res)
-                    return [tha_res]
-                else:
-                    tha_res = self.tha.inference(pose.astype(np.float32))
-                    self.cacher.write(hs, tha_res)
-                    return self.rife.inference(tha_res)
             cached = self.cacher.read(hs)
             if cached is not None:
-                self.continual_cache_counter += 1
+                if self.cacher.cache_quality != 100:
+                    cached[:,:,3] = self.last_tha_res[:,:,3]
                 if self.rife is None:
                     return [cached]
                 else:
                     return self.rife.inference(cached)
             else:
-                self.continual_cache_counter = 0
                 if self.rife is None:
                     tha_res = self.tha.inference(pose.astype(np.float32))
                     self.cacher.write(hs, tha_res)
