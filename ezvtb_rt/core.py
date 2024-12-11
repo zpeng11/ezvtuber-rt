@@ -115,6 +115,10 @@ class CoreCached():
             return self.rife.fetchRes()
         else:
             self.continual_cache_counter += 1
-            self.rife.memories['latest_frame'].host[:,:,:3] = cached[:,:,:3]
-            self.rife.memories['latest_frame'].htod(self.rife.instream)
+            if self.cacher.cache_quality != 100:
+                self.rife.memories['latest_frame'].host[:,:,:3] = cached[:,:,:3]
+                self.rife.memories['latest_frame'].htod(self.rife.instream)
+            else:
+                np.copyto(self.rife.memories['latest_frame'].host, cached)
+                self.rife.memories['latest_frame'].htod(self.rife.instream)
             return self.rife.inference(True)
