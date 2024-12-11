@@ -24,32 +24,28 @@ def cudaSetDevice(device_idx):
 def check_build_all_models() -> bool:
     all_models_list = check_exist_all_models()
     #Check TRT support
+    print('Start testing if TensorRT works on this machine')
     try:
-        ret = build_engine(all_models_list[0], 'fp32')
-    except:
-        print('This device does not support tensorrt!')
-        return False
-    if ret is None:
-        print('This device does not support tensorrt!')
-        return False
-    print('Building for models...')
-    for fullpath in tqdm(all_models_list):
-        dir, filename = os.path.split(fullpath)
-        trt_filename = filename.split('.')[0] + '.trt'
-        trt_fullpath = os.path.join(dir, trt_filename)
-        if os.path.isfile(trt_fullpath):
-            try:
-                if load_engine(trt_fullpath) is not None:
-                    continue
-                else:
+        for fullpath in tqdm(all_models_list):
+            dir, filename = os.path.split(fullpath)
+            trt_filename = filename.split('.')[0] + '.trt'
+            trt_fullpath = os.path.join(dir, trt_filename)
+            if os.path.isfile(trt_fullpath):
+                try:
+                    if load_engine(trt_fullpath) is not None:
+                        continue
+                    else:
+                        print(f'Can not successfully load {trt_fullpath}, build again')
+                except:
                     print(f'Can not successfully load {trt_fullpath}, build again')
-            except:
-                print(f'Loading {trt_fullpath} failed, building agian')
-        dtype = 'fp16' if 'fp16' in dir else 'fp32'
-        engine_seri = build_engine(fullpath, dtype)
-        if engine_seri is None:
-            raise ValueError(f'TRT build for {dir} failed, please check model')
-        save_engine(engine_seri, trt_fullpath)
+            dtype = 'fp16' if 'fp16' in dir else 'fp32'
+            engine_seri = build_engine(fullpath, dtype)
+            if engine_seri is None:
+                print('Error while building engine')
+                return False
+            save_engine(engine_seri, trt_fullpath)
+    except:
+        return False
     return True
 
 

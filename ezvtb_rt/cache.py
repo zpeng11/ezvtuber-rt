@@ -21,14 +21,14 @@ class Cacher(ABC):
     
 
 class RAMCacher(Cacher):
-    def __init__(self, max_size:int = 2, quality:int = 90, siz:int = 512): #Size in GBs
+    def __init__(self, max_size:int = 2, quality:int = 90,  image_size:int = 512): #Size in GBs
         self.max_kbytes = max_size * 1024 * 1024
         self.cached_kbytes = 0
         self.cache = OrderedDict()
         self.hits = 0
         self.miss = 0
         self.quality = quality
-        self.size = siz
+        self.size = image_size
     def read(self, hs:int) -> np.ndarray:
         cached = self.cache.get(hs)
         if cached is not None:
@@ -148,20 +148,19 @@ class WriterProcess(Process): # A seperate process that write input to database,
 
 
 class DBCacherMP(Cacher):
-    def __init__(self, max_size:int = 1,  db_dir:str = '.', cache_quality:int = 90) -> None:
-        os.makedirs(db_dir, exist_ok=True)
-        db_path = os.path.join(db_dir, 'cacher.sqlite')
+    def __init__(self, max_size:int = 1,  db_dir:str = './cacher.sqlite', cache_quality:int = 90, image_size:int = 512) -> None:
         self.read_trigger = Queue()
         self.read_return = Queue()
-        self.reader = ReaderProcess(self.read_trigger, self.read_return, db_path, max_size)
+        self.reader = ReaderProcess(self.read_trigger, self.read_return, db_dir, max_size)
         self.reader.start()
         ready = self.read_return.get(timeout=1.0)
         assert(ready in 'ready')
         self.write_queue = Queue()
-        self.writer = WriterProcess(self.write_queue, db_path, cache_quality)
+        self.writer = WriterProcess(self.write_queue, db_dir, cache_quality)
         self.writer.start()
         self.hits = 0
         self.miss = 0
+        self.size = image_size
 
 
     def read(self, hs:int) -> np.ndarray:
@@ -176,7 +175,7 @@ class DBCacherMP(Cacher):
             else:
                 self.hits += 1
                 buf = turbojpeg.decompress(ret[1], fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
-                return np.ndarray((512,512,4), dtype=np.uint8, buffer=buf)
+                return np.ndarray((self.size,self.size,4), dtype=np.uint8, buffer=buf)
 
         except queue.Empty:
             print('Warning DB read slow!')
