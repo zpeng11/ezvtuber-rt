@@ -21,20 +21,20 @@ class Cacher(ABC):
     
 
 class RAMCacher(Cacher):
-    def __init__(self, max_size:int = 2, quality:int = 90,  image_size:int = 512): #Size in GBs
+    def __init__(self, max_size:int = 2, cache_quality:int = 90,  image_size:int = 512): #Size in GBs
         self.max_kbytes = max_size * 1024 * 1024
         self.cached_kbytes = 0
         self.cache = OrderedDict()
         self.hits = 0
         self.miss = 0
-        self.quality = quality
+        self.cache_quality = cache_quality
         self.size = image_size
     def read(self, hs:int) -> np.ndarray:
         cached = self.cache.get(hs)
         if cached is not None:
             self.hits += 1
             self.cache.move_to_end(hs)
-            if self.quality == 100:
+            if self.cache_quality == 100:
                 img = cached
             else:
                 res = turbojpeg.decompress(cached, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
@@ -44,14 +44,14 @@ class RAMCacher(Cacher):
             self.miss += 1
             return None
     def write(self, hs:int, data:np.ndarray):
-        if self.quality == 100:
+        if self.cache_quality == 100:
             self.cache[hs] = data.copy()
             self.cached_kbytes += data.nbytes /1024
             while self.cached_kbytes > self.max_kbytes:
                 poped = self.cache.popitem(last=False)
                 self.cached_kbytes -= poped[1].nbytes/1024
         else:
-            compressed = turbojpeg.compress(data, self.quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
+            compressed = turbojpeg.compress(data, self.cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
             self.cache[hs] = compressed
             self.cached_kbytes += len(compressed) /1024
             while self.cached_kbytes > self.max_kbytes:
@@ -129,7 +129,10 @@ class WriterProcess(Process): # A seperate process that write input to database,
                 print('Writer get ending signal')
                 break
             hs = res[0]
-            cache_bytes = turbojpeg.compress(res[1], self.cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize=True, pixelformat=turbojpeg.BGRA)
+            if self.cache_quality != 100:
+                cache_bytes = turbojpeg.compress(res[1], self.cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize=True, pixelformat=turbojpeg.BGRA)
+            else:
+                cache_bytes = res[1].tobytes()
             self.conn.execute('INSERT OR IGNORE INTO cache(hash, bytes) VALUES (?, ?)',(hs, cache_bytes))
             self.conn.commit()
         self.conn.close()
@@ -161,24 +164,35 @@ class DBCacherMP(Cacher):
         self.hits = 0
         self.miss = 0
         self.size = image_size
+        self.cache_quality = cache_quality
 
 
     def read(self, hs:int) -> np.ndarray:
+        while not self.read_return.empty():#Ensure empty
+            self.read_return.get_nowait()
+
         self.read_trigger.put_nowait(hs)
         try:
             ret = self.read_return.get(block=True, timeout=0.001) #Only wait for 1ms for read here
-            while(ret is list and ret[0] != hs):
-                ret = self.read_return.get(block=True, timeout=0.001) # This works for removing missed read
+            if ret[0] != hs:
+                print('Warning DB read slow! no match')
+                self.miss += 1
+                return None
+            
             if ret[1] is None:
                 self.miss += 1
                 return None
-            else:
-                self.hits += 1
+            
+            self.hits += 1
+            if self.cache_quality != 100:
                 buf = turbojpeg.decompress(ret[1], fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
                 return np.ndarray((self.size,self.size,4), dtype=np.uint8, buffer=buf)
+            else:
+                return np.frombuffer(ret[1], np.uint8).reshape((self.size,self.size,4))
 
         except queue.Empty:
             print('Warning DB read slow!')
+            self.miss += 1
             return None
 
     def write(self, hs:int, data:np.ndarray):
