@@ -94,7 +94,7 @@ class THACoreSimple(THACore): #Simple implementation of tensorrt tha core, just 
         self.memories['input_img'].htod(self.updatestream)
         self.decomposer.exec(self.updatestream)
         self.updatestream.synchronize()
-    def inference(self, pose:np.ndarray) -> np.ndarray: #Start inferencing given input and return result of previous frame
+    def inference(self, pose:np.ndarray,  return_now:bool =False) -> np.ndarray: #Start inferencing given input and return result of previous frame
         
         self.outstream.wait_for_event(self.finishedExec)
         self.memories['output_cv_img'].dtoh(self.outstream)
