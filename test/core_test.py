@@ -237,7 +237,7 @@ def CoreCachedPerf():
 def CoreCacheShow():
     tha_core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
     rife_core = RIFECoreLinked('./data/rife_lite_v4_25/x2/fp16', tha_core)
-    cacher = DBCacherMP()
+    cacher = DBCacherMP(cache_quality=90)
     core = CoreCached(tha_core, cacher, rife_core)
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
 
@@ -247,11 +247,11 @@ def CoreCacheShow():
 
     def createInterpolatedVideo(poses, core):
         new_vid = []
-        for i in range(len(poses)):
+        for i in tqdm(range(len(poses))):
             outputs = core.inference(np.array(poses[i]).reshape(1,45))
             for output in outputs:
                 new_vid.append(output[:,:,:3].copy())
-        for i in range(len(poses)):
+        for i in tqdm(range(len(poses))):
             outputs = core.inference(np.array(poses[i]).reshape(1,45))
             for output in outputs:
                 new_vid.append(output[:,:,:3].copy())
@@ -260,10 +260,42 @@ def CoreCacheShow():
     generate_video(new_vid, './test/data/core/cached_core_half_sepe_fp16_x2_fp16.mp4', 40)
     print(core.cacher.hits, core.cacher.miss)
 
+def cacher_debug():
+    tha_core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
+    rife_core = RIFECoreLinked('./data/rife_lite_v4_25/x2/fp16', tha_core)
+    cacher = DBCacherMP(cache_quality=100)
+    core = CoreCached(tha_core, cacher, rife_core)
+    core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
+    with open('./test/data/pose_20fps.json', 'r') as file:
+        pose_data = json.load(file)
+    pose_data = pose_data[800:1000]
+    vid1 = []
+    for i in range(len(pose_data)):
+        outputs = core.inference(np.array(pose_data[i]).reshape(1,45))
+        for output in outputs:
+            vid1.append(output[:,:,:3].copy())
+    vid1 = vid1[1:]
+    vid2 = []
+    for i in range(len(pose_data)):
+        outputs = core.inference(np.array(pose_data[i]).reshape(1,45))
+        for output in outputs:
+            vid2.append(output[:,:,:3].copy())
+    vid2 = vid2[1:]
+
+    error_sum = 0.0
+    for i in range(len(vid1)):
+        error_sum += np.abs(vid1[i] - vid2[i]).sum()/vid1[i].size
+    print(error_sum/len(vid1))
+    print(cacher.hits)
+
 if __name__ == "__main__":
     check_build_all_models()
     os.makedirs('./test/data/core', exist_ok=True)
+    db_path= './cacher.sqlite'
+    if os.path.exists(db_path):
+        os.remove(db_path)
     CorePerf()
     CoreTestShow()
     CoreCacheShow()
     CoreCachedPerf()
+    cacher_debug()

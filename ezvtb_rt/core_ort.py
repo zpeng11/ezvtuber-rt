@@ -49,12 +49,11 @@ class CoreORTCached:
                 else:
                     return self.rife.inference(cached)
             else:
+                tha_res = self.tha.inference(pose.astype(np.float32))
+                self.cacher.write(hs, tha_res)
+                self.last_tha_res = tha_res
                 if self.rife is None:
-                    tha_res = self.tha.inference(pose.astype(np.float32))
-                    self.cacher.write(hs, tha_res)
                     return [tha_res]
                 else:
-                    tha_res = self.tha.inference(pose.astype(np.float32))
-                    self.cacher.write(hs, tha_res)
                     return self.rife.inference(tha_res)
 

@@ -45,7 +45,7 @@ class RAMCacher(Cacher):
             return None
     def write(self, hs:int, data:np.ndarray):
         if self.cache_quality == 100:
-            self.cache[hs] = np.array(data)
+            self.cache[hs] = data.copy()
             self.cached_kbytes += data.nbytes /1024
             while self.cached_kbytes > self.max_kbytes:
                 poped = self.cache.popitem(last=False)

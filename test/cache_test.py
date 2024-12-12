@@ -12,7 +12,7 @@ import random
 def RAMCacherTest():
     img = cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED)
     buf = np.ndarray((512, 512, 4), dtype=np.uint8)
-    cacher = RAMCacher(1)
+    cacher = RAMCacher(1, cache_quality=100)
     for i in tqdm(range(1000)):
         time.sleep(0.02)
         cacher.read(random.randint(-1000000000, 1000000000))
@@ -24,7 +24,7 @@ def RAMCacherTest():
 def DBCacherTest():
     img = cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED)
     buf = np.ndarray((512, 512, 4), dtype=np.uint8)
-    cacher = DBCacherMP(cache_quality=90)
+    cacher = DBCacherMP(cache_quality=100)
     cacher.write(0, img)
     for i in tqdm(range(1000)):
         time.sleep(0.02)
