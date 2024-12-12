@@ -156,7 +156,7 @@ class DBCacherMP(Cacher):
         self.read_return = Queue()
         self.reader = ReaderProcess(self.read_trigger, self.read_return, db_dir, max_size)
         self.reader.start()
-        ready = self.read_return.get(timeout=1.0)
+        ready = self.read_return.get(timeout=10.0)
         assert(ready in 'ready')
         self.write_queue = Queue()
         self.writer = WriterProcess(self.write_queue, db_dir, cache_quality)
