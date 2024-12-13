@@ -77,7 +77,7 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
         print('Reader start running')
         while True:
             try:
-                hs = self.read_trigger.get(block=True, timeout=100.0)
+                hs = self.read_trigger.get(block=True, timeout=20.0)
             except queue.Empty:
                 print('Reader trigger timeout or other exception')
                 hs = None
@@ -86,7 +86,7 @@ class ReaderProcess(Process): # A seperate process that reads input from databas
                 print('Reader gets ending signal')
                 break
             ret = self.conn.execute('SELECT * FROM cache WHERE hash=?', (hs,)).fetchone()
-            if not ret:
+            if ret is None:
                 self.read_return.put_nowait((hs, None))
             else:
                 self.read_return.put_nowait((hs, ret[1]))
@@ -121,7 +121,7 @@ class WriterProcess(Process): # A seperate process that write input to database,
         print('Writer start runing')
         while True:
             try:
-                res = self.write_queue.get(block=True, timeout=100.0)
+                res = self.write_queue.get(block=True, timeout=20.0)
             except queue.Empty:
                 print('Writer trigger timeout or other exception')
                 res = None
@@ -173,9 +173,9 @@ class DBCacherMP(Cacher):
 
         self.read_trigger.put_nowait(hs)
         try:
-            ret = self.read_return.get(block=True, timeout=0.001) #Only wait for 1ms for read here
+            ret = self.read_return.get(block=True, timeout=0.002) #Only wait for 1ms for read here
             if ret[0] != hs:
-                print('Warning DB read slow! no match')
+                print('Warning DB read slow! no match', self.miss, self.hits)
                 self.miss += 1
                 return None
             
@@ -191,8 +191,8 @@ class DBCacherMP(Cacher):
                 return np.frombuffer(ret[1], np.uint8).reshape((self.size,self.size,4))
 
         except queue.Empty:
-            print('Warning DB read slow!')
             self.miss += 1
+            print('Warning DB read slow!', self.miss, self.hits)
             return None
 
     def write(self, hs:int, data:np.ndarray):
