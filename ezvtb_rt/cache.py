@@ -196,7 +196,7 @@ class DBCacherMP(Cacher):
             return None
 
     def write(self, hs:int, data:np.ndarray):
-        self.write_queue.put_nowait((hs, np.array(data.copy)))
+        self.write_queue.put_nowait((hs, np.array(data)))
 
     def close(self):
         self.read_trigger.put_nowait(None)
