@@ -45,7 +45,7 @@ class RAMCacher(Cacher):
             return None
     def write(self, hs:int, data:np.ndarray):
         if self.cache_quality == 100:
-            self.cache[hs] = data.copy()
+            self.cache[hs] = np.array(data)
             self.cached_kbytes += data.nbytes /1024
             while self.cached_kbytes > self.max_kbytes:
                 poped = self.cache.popitem(last=False)
@@ -196,7 +196,7 @@ class DBCacherMP(Cacher):
             return None
 
     def write(self, hs:int, data:np.ndarray):
-        self.write_queue.put_nowait((hs, data.copy()))
+        self.write_queue.put_nowait((hs, np.array(data.copy)))
 
     def close(self):
         self.read_trigger.put_nowait(None)
