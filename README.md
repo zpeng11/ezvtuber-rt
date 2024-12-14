@@ -59,7 +59,7 @@ Please download and extract to `/data` folder for algorithm to run.
 ### Fix FP16 with Onnxruntime DirectML
 FP16 kernels has undetected bug on devices with FP16 support.
 ### Super Resolution for output
-Multiple Anime Super Resolution models are under tests right now to find out efficiency and quality balance.
+Multiple Anime Super Resolution models are under tests right now to find out efficiency and quality balance. This feature should be up soon :)
 ### INT8 Quantization and mobile deployment
 ## References
 ```
