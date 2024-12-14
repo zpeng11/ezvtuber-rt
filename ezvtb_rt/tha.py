@@ -204,9 +204,9 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         np.copyto(self.memories['rotation_pose'].host, rotation_pose)
         self.memories['rotation_pose'].htod(self.instream)
 
-        morpher_hash = hash(frozenset(pose[:,:12+27].flatten()))
+        morpher_hash = hash(str(pose[0,:12+27]))
         morpher_cached = self.morpher_cacher.read_mem_set(morpher_hash)
-        combiner_hash = hash(frozenset(pose[:,:12].flatten()))
+        combiner_hash = hash(str(pose[0,:12]))
         combiner_cached = self.combiner_cacher.read_mem_set(combiner_hash)
 
         self.cachestream.synchronize()
@@ -339,9 +339,9 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         np.copyto(self.memories['rotation_pose'].host, rotation_pose)
         self.memories['rotation_pose'].htod(self.instream)
 
-        morpher_hash = hash(frozenset(pose[:,:12+27].flatten()))
+        morpher_hash = hash(str(pose[0,:12+27]))
         morpher_cached = self.cache.get(morpher_hash)
-        combiner_hash = hash(frozenset(pose[:,:12].flatten()))
+        combiner_hash = hash(str(pose[0,:12]))
         combiner_cached = self.cache.get(combiner_hash)
 
         self.cachestream.synchronize()

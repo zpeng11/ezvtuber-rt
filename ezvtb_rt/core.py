@@ -76,7 +76,7 @@ class CoreCached():
             else:
                 return [self.tha.inference(pose,True)]
 
-        hs = hash(frozenset(np.array(pose).flatten()))
+        hs = hash(str(pose))
 
         cached = self.cacher.read(hs)
 
