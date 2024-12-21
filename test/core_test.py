@@ -17,93 +17,93 @@ import cv2
 
 def CorePerf():
     cuda.start_profiler()
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x2/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x3/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x4/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x2/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x3/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x4/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x2/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x3/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x4/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x2/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x3/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x4/fp16')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x2/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x2/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x3/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x3/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x4/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x4/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x2/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x2/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x3/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x3/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x4/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x4/fp32')
     core.setImage(np.random.rand(512,512, 4).astype(np.uint8))
     for i in tqdm(range(1000)):
         core.inference(np.random.rand(1,45))
@@ -126,99 +126,99 @@ def CoreTestShow():
             new_vid.append(output[:,:,:3].copy())
         return new_vid
 
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x2/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp16_x2.mp4', 20)
 
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x3/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp16_x3.mp4', 30)
 
-    core = Core('./data/tha3/seperable/fp16', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/seperable/fp16', './data/rife_512/x4/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp16_x4.mp4', 40)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x2/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x2.mp4', 20)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x3/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x3.mp4', 30)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x4/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x4.mp4', 40)
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x2/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp16_x2.mp4', 20)
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x3/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp16_x3.mp4', 30)
 
-    core = Core('./data/tha3/standard/fp16', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/standard/fp16', './data/rife_512/x4/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp16_x4.mp4', 40)
     
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x2/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x2/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x2.mp4', 20)
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x3/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x3/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x3.mp4', 30)
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x4/fp16')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x4/fp16')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x4.mp4', 40)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x2/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x2/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x2_fp32.mp4', 20)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x3/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x3/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x3_fp32.mp4', 30)
 
-    core = Core('./data/tha3/seperable/fp32', './data/rife_lite_v4_25/x4/fp32')
+    core = Core('./data/tha3/seperable/fp32', './data/rife_512/x4/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_sepe_fp32_x4_fp32.mp4', 40)
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x2/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x2/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x2_fp32.mp4', 20)
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x3/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x3/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x3_fp32.mp4', 30)
 
-    core = Core('./data/tha3/standard/fp32', './data/rife_lite_v4_25/x4/fp32')
+    core = Core('./data/tha3/standard/fp32', './data/rife_512/x4/fp32')
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
     new_vid = createInterpolatedVideo(pose_data, core)
     generate_video(new_vid, './test/data/core/half_stan_fp32_x4_fp32.mp4', 40)
     
 def CoreCachedPerf():
     tha_core = THACoreCachedVRAM('./data/tha3/seperable/fp16', 2)
-    rife_core = RIFECoreLinked('./data/rife_lite_v4_25/x3/fp16', tha_core)
+    rife_core = RIFECoreLinked('./data/rife_512/x3/fp16', tha_core)
     cacher = DBCacherMP()
     core = CoreCached(tha_core, cacher, rife_core)
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
@@ -236,7 +236,7 @@ def CoreCachedPerf():
 
 def CoreCacheShow():
     tha_core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
-    rife_core = RIFECoreLinked('./data/rife_lite_v4_25/x2/fp16', tha_core)
+    rife_core = RIFECoreLinked('./data/rife_512/x2/fp16', tha_core)
     cacher = DBCacherMP(cache_quality=90)
     core = CoreCached(tha_core, cacher, rife_core)
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
@@ -262,7 +262,7 @@ def CoreCacheShow():
 
 def cacher_debug():
     tha_core = THACoreCachedVRAM('./data/tha3/seperable/fp16')
-    rife_core = RIFECoreLinked('./data/rife_lite_v4_25/x2/fp16', tha_core)
+    rife_core = RIFECoreLinked('./data/rife_512/x2/fp16', tha_core)
     cacher = DBCacherMP(cache_quality=100)
     core = CoreCached(tha_core, cacher, rife_core)
     core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))

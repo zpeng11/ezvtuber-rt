@@ -18,27 +18,27 @@ def RIFETestPerf():
     img1 = np.random.rand(512,512, 4).astype(np.uint8)
     img2 = np.random.rand(512,512, 4).astype(np.uint8)
     cuda.start_profiler()
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x2/fp16')
+    core = RIFECoreSimple('./data/rife_512/x2/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x2/fp32')
+    core = RIFECoreSimple('./data/rife_512/x2/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x3/fp16')
+    core = RIFECoreSimple('./data/rife_512/x3/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x3/fp32')
+    core = RIFECoreSimple('./data/rife_512/x3/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x4/fp16')
+    core = RIFECoreSimple('./data/rife_512/x4/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x4/fp32')
+    core = RIFECoreSimple('./data/rife_512/x4/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
@@ -77,27 +77,27 @@ def RIFETestShow():
             new_vid.append(inter.copy()[:,:,:3])
         return new_vid
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x2/fp16')
+    core = RIFECoreSimple('./data/rife_512/x2/fp16')
     new_vid = createInterpolatedVideo(tha_res, core)
     generate_video(new_vid, './test/data/rife/x2.mp4', 40)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x3/fp16')
+    core = RIFECoreSimple('./data/rife_512/x3/fp16')
     new_vid = createInterpolatedVideo(tha_res, core)
     generate_video(new_vid, './test/data/rife/x3.mp4', 60)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x4/fp16')
+    core = RIFECoreSimple('./data/rife_512/x4/fp16')
     new_vid = createInterpolatedVideo(tha_res, core)
     generate_video(new_vid, './test/data/rife/x4.mp4', 80)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x2/fp16')
+    core = RIFECoreSimple('./data/rife_512/x2/fp16')
     new_vid = createInterpolatedVideo(tha_res[::2], core)
     generate_video(new_vid, './test/data/rife/halfx2.mp4', 20)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x3/fp16')
+    core = RIFECoreSimple('./data/rife_512/x3/fp16')
     new_vid = createInterpolatedVideo(tha_res[::2], core)
     generate_video(new_vid, './test/data/rife/halfx3.mp4', 30)
 
-    core = RIFECoreSimple('./data/rife_lite_v4_25/x4/fp16')
+    core = RIFECoreSimple('./data/rife_512/x4/fp16')
     new_vid = createInterpolatedVideo(tha_res[::2], core)
     generate_video(new_vid, './test/data/rife/halfx4.mp4', 40)
 
