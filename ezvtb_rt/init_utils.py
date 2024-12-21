@@ -65,4 +65,4 @@ def check_exist_all_models():
                     raise ValueError('Data is not prepared')
                 onnx.checker.check_model(onnx_file)
                 waifu2x_list.append(onnx_file)
-    return rife_list + tha_list + real_esrgan_list + waifu2x_list
+    return rife_list + tha_list #+ real_esrgan_list + waifu2x_list
