@@ -84,24 +84,21 @@ class RIFECoreLinked(RIFECore):
         super().__init__(model_dir, tha_core.memories['output_cv_img'])
         self.instream = tha_core.instream
         self.copystream = cuda.Stream() 
-        self.finishedCopy = cuda.Event()
         self.finishedExec = cuda.Event()
         self.finishedFetch = cuda.Event()
         self.returned = True
 
     def inference(self, return_now:bool) -> List[np.ndarray]:
-        self.instream.wait_for_event(self.finishedCopy)
+        self.copystream.synchronize()
         self.engine.exec(self.instream)
         self.finishedExec.record(self.instream)
 
-        for i in range(self.scale):
-            self.memories['framegen_'+str(i)].dtoh(self.instream)
-        self.finishedFetch.record(self.instream)
-
         self.copystream.wait_for_event(self.finishedExec)
+        for i in range(self.scale):
+            self.memories['framegen_'+str(i)].dtoh(self.copystream)
+        self.finishedFetch.record(self.copystream)
         cuda.memcpy_dtod_async(self.memories['old_frame'].device, self.memories['latest_frame'].device, 
                                    self.memories['latest_frame'].host.nbytes, self.copystream)
-        self.finishedCopy.record(self.copystream)
         self.returned = False
 
         if return_now:

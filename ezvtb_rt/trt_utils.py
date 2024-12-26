@@ -38,7 +38,7 @@ def check_build_all_models() -> bool:
                         print(f'Can not successfully load {trt_fullpath}, build again')
                 except:
                     print(f'Can not successfully load {trt_fullpath}, build again')
-            dtype = 'fp16' if 'fp16' in dir else 'fp32'
+            dtype = 'fp16' if 'fp16' in fullpath else 'fp32'
             engine_seri = build_engine(fullpath, dtype)
             if engine_seri is None:
                 print('Error while building engine')

@@ -15,30 +15,30 @@ import cv2
 
 def RIFETestPerf():
     
-    img1 = np.random.rand(512,512, 4).astype(np.uint8)
-    img2 = np.random.rand(512,512, 4).astype(np.uint8)
+    img1 = np.random.rand(1024,1024, 4).astype(np.uint8)
+    img2 = np.random.rand(1024,1024, 4).astype(np.uint8)
     cuda.start_profiler()
-    core = RIFECoreSimple('./data/rife_512/x2/fp16')
+    core = RIFECoreSimple('./data/rife_1024/x2/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_512/x2/fp32')
+    core = RIFECoreSimple('./data/rife_1024/x2/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_512/x3/fp16')
+    core = RIFECoreSimple('./data/rife_1024/x3/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_512/x3/fp32')
+    core = RIFECoreSimple('./data/rife_1024/x3/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_512/x4/fp16')
+    core = RIFECoreSimple('./data/rife_1024/x4/fp16')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 
-    core = RIFECoreSimple('./data/rife_512/x4/fp32')
+    core = RIFECoreSimple('./data/rife_1024/x4/fp32')
     for i in tqdm(range(1000)):
         ret = core.run(img1, img2)
 

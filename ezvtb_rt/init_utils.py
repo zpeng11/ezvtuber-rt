@@ -48,21 +48,21 @@ def check_exist_all_models():
                     raise ValueError('Data is not prepared')
                 onnx.checker.check_model(onnx_file)
                 tha_list.append(onnx_file)
-    # real_esrgan_list = [os.path.join(data_dir,'Real-ESRGAN','exported_256_fp16.onnx'), os.path.join(data_dir,'Real-ESRGAN','exported_256.onnx')]
-    # waifu2x_dtypes = ['fp32','fp16']
-    # waifu2x_train_sources = ['art', 'photo']
-    # waifu2x_models = ['noise0_scale2x.onnx', 
-    #                   'noise1_scale2x.onnx', 
-    #                   'noise2_scale2x.onnx',
-    #                   'noise3_scale2x.onnx',
-    #                   'scale2x.onnx']
-    # waifu2x_list = []
-    # for waifu2x_dtype in waifu2x_dtypes:
-    #     for waifu2x_train_source in waifu2x_train_sources:
-    #         for waifu2x_model in waifu2x_models:
-    #             onnx_file = os.path.join(data_dir, 'waifu2x_upconv', waifu2x_dtype, 'upconv_7', waifu2x_train_source, waifu2x_model)
-    #             if not os.path.isfile(onnx_file):
-    #                 raise ValueError('Data is not prepared')
-    #             onnx.checker.check_model(onnx_file)
-    #             waifu2x_list.append(onnx_file)
-    return rife_list + tha_list #+ real_esrgan_list + waifu2x_list
+    real_esrgan_list = [os.path.join(data_dir,'Real-ESRGAN','exported_256_fp16.onnx'), os.path.join(data_dir,'Real-ESRGAN','exported_256.onnx')]
+    waifu2x_dtypes = ['fp32','fp16']
+    waifu2x_train_sources = ['art', 'photo']
+    waifu2x_models = ['noise0_scale2x.onnx', 
+                      'noise1_scale2x.onnx', 
+                      'noise2_scale2x.onnx',
+                      'noise3_scale2x.onnx',
+                      'scale2x.onnx']
+    waifu2x_list = []
+    for waifu2x_dtype in waifu2x_dtypes:
+        for waifu2x_train_source in waifu2x_train_sources:
+            for waifu2x_model in waifu2x_models:
+                onnx_file = os.path.join(data_dir, 'waifu2x_upconv', waifu2x_dtype, 'upconv_7', waifu2x_train_source, waifu2x_model)
+                if not os.path.isfile(onnx_file):
+                    raise ValueError('Data is not prepared')
+                onnx.checker.check_model(onnx_file)
+                waifu2x_list.append(onnx_file)
+    return rife_list + tha_list + real_esrgan_list + waifu2x_list

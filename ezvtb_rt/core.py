@@ -2,6 +2,7 @@ from ezvtb_rt.trt_utils import *
 from ezvtb_rt.rife import RIFECore, RIFECoreLinked
 from ezvtb_rt.tha import THACore
 from ezvtb_rt.cache import Cacher
+from ezvtb_rt.sr import SRLinked
 
 class Core():
     def __init__(self, tha_model_dir:str, rift_model_dir:str):
@@ -61,9 +62,10 @@ class Core():
         return ret
 
 class CoreCached():
-    def __init__(self, cached_tha_core:THACore, cacher:Cacher = None, rife_core:RIFECoreLinked = None):
+    def __init__(self, cached_tha_core:THACore, cacher:Cacher = None, sr:SRLinked = None, rife_core:RIFECoreLinked = None):
         self.tha = cached_tha_core
         self.cacher = cacher
+        self.sr = sr
         self.rife = rife_core
     def setImage(self, img:np.ndarray):
         self.tha.setImage(img)
@@ -72,9 +74,15 @@ class CoreCached():
         if self.cacher is None: #Optional to disable cacher
             if self.rife is not None:
                 self.tha.inference(pose, False)
+                if self.sr is not None:
+                    self.sr.inference(False)
                 return self.rife.inference(True)
             else:
-                return [self.tha.inference(pose,True)]
+                if self.sr is None:
+                    return [self.tha.inference(pose,True)]
+                else:
+                    self.tha.inference(pose, False)
+                    return [self.sr.inference(True)]
 
         hs = hash(str(pose))
 
@@ -82,18 +90,26 @@ class CoreCached():
 
         if self.rife is None: #optional to disable rife
             if cached is None:
-                tha_res = self.tha.inference(pose, True)
-                self.cacher.write(hs, tha_res)
-                return [tha_res]
+                if self.sr is None:
+                    tha_res = self.tha.inference(pose, True)
+                    self.cacher.write(hs, tha_res)
+                    return [tha_res]
+                else:
+                    self.tha.inference(pose, False)
+                    sr_res = self.sr.inference(True)
+                    self.cacher.write(hs, sr_res)
+                    return [sr_res]
             else:
                 if self.cacher.cache_quality != 100:
-                    cached[:,:,3] = self.tha.memories['output_cv_img'].host[:,:,3]
+                    cached[:,:,3] = self.tha.memories['output_cv_img'].host[:,:,3] if self.sr is None else self.sr.memories['output_cv_img'].host[:,:,3]
                 return [cached]
 
         if cached is None:
             self.tha.inference(pose, False)
+            if self.sr is not None:
+                self.sr.inference(False)
             self.rife.inference(False)
-            tha_res = self.tha.fetchRes()
+            tha_res = self.tha.fetchRes() if self.sr is None else self.sr.fetchRes()
             self.cacher.write(hs, tha_res)
             return self.rife.fetchRes()
         else:
