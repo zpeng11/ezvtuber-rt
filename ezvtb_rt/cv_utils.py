@@ -6,7 +6,7 @@ from typing import List
 def generate_video(imgs:List[np.ndarray], video_path:str, framerate:float): #Images should be prepared to be opencv image layout
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    video = cv2.VideoWriter(video_path, fourcc, framerate, (512, 512))
+    video = cv2.VideoWriter(video_path, fourcc, framerate, (imgs[0].shape[0], imgs[0].shape[1]))
     if not video.isOpened():
         raise ValueError("CV2 video encoder Not supported")
 

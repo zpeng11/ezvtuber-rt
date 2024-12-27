@@ -80,7 +80,7 @@ class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, ju
         return ret
     
 class RIFECoreLinked(RIFECore):
-    def __init__(self, model_dir, tha_core:THACore):
+    def __init__(self, model_dir, tha_core):
         super().__init__(model_dir, tha_core.memories['output_cv_img'])
         self.instream = tha_core.instream
         self.copystream = cuda.Stream() 
