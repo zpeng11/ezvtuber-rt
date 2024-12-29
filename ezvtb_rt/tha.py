@@ -68,9 +68,11 @@ class THACore:
         self.editor.setOutputMems(editor_outputs)
     def setImage(self, img:np.ndarray):
         raise ValueError('No provided implementation')
-    def inference(self, pose:np.ndarray, return_now:bool) -> np.ndarray:
+    def inference(self, pose:np.ndarray, return_now:bool) -> List[np.ndarray]:
         raise ValueError('No provided implementation')
-    def fetchRes(self)->np.ndarray:
+    def fetchRes(self)->List[np.ndarray]:
+        raise ValueError('No provided implementation')
+    def viewRes(self)->List[np.ndarray]:
         raise ValueError('No provided implementation')
 
 
@@ -166,7 +168,7 @@ class VRAMCacher(object):
         return mem_set
 
 class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
-    def __init__(self, model_dir, vram_cache_size:float = 1):
+    def __init__(self, model_dir, vram_cache_size:float = 1.0):
         super().__init__(model_dir)
         self.combiner_cacher = VRAMCacher(self.memories['eyebrow_image'].host.nbytes, 
                                           self.memories['morpher_decoded'].host.nbytes, 
@@ -196,7 +198,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         self.decomposer.exec(self.updatestream)
         self.updatestream.synchronize()
 
-    def inference(self, pose:np.ndarray, return_now:bool=False) -> np.ndarray: #This inference is running in a synchronized way
+    def inference(self, pose:np.ndarray, return_now:bool=False) -> List[np.ndarray]: #This inference is running in a synchronized way
         eyebrow_pose = pose[:, :12]
         face_pose = pose[:,12:12+27]
         rotation_pose = pose[:,12+27:]
@@ -287,19 +289,21 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         if return_now:
             self.finishedFetch.synchronize()
             self.returned = True
-            return self.memories['output_cv_img'].host
+            return [self.memories['output_cv_img'].host]
         else:
             return None
-    def fetchRes(self)->np.ndarray:
+    def fetchRes(self)->List[np.ndarray]:
         if self.returned == True:
             raise ValueError('Already fetched result')
         self.finishedFetch.synchronize()
         self.returned = True
-        return self.memories['output_cv_img'].host
+        return [self.memories['output_cv_img'].host]
+    def viewRes(self)->List[np.ndarray]:
+        return [self.memories['output_cv_img'].host]
 
 
 class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
-    def __init__(self, model_dir, ram_cache_size:float = 1):
+    def __init__(self, model_dir, ram_cache_size:float = 2.0):
         super().__init__(model_dir)
         self.cache = OrderedDict()
         self.cached_kbytes = 0
@@ -331,7 +335,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         self.decomposer.exec(self.updatestream)
         self.updatestream.synchronize()
 
-    def inference(self, pose:np.ndarray, return_now:bool = False) -> np.ndarray: #This inference is running in a synchronized way
+    def inference(self, pose:np.ndarray, return_now:bool = False) -> List[np.ndarray]: #This inference is running in a synchronized way
         eyebrow_pose = pose[:, :12]
         face_pose = pose[:,12:12+27]
         rotation_pose = pose[:,12+27:]
@@ -449,12 +453,14 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         if return_now:
             self.finishedFetch.synchronize()
             self.returned = True
-            return self.memories['output_cv_img'].host
+            return [self.memories['output_cv_img'].host]
         else:
             return None
-    def fetchRes(self)->np.ndarray:
+    def fetchRes(self)->List[np.ndarray]:
         if self.returned == True:
             raise ValueError('Already fetched result')
         self.finishedFetch.synchronize()
         self.returned = True
-        return self.memories['output_cv_img'].host
+        return [self.memories['output_cv_img'].host]
+    def viewRes(self)->List[np.ndarray]:
+        return [self.memories['output_cv_img'].host]

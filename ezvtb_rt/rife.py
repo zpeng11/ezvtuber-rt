@@ -39,6 +39,8 @@ class RIFECore:
         raise ValueError('No provided implementation')
     def fetchRes(self)->List[np.ndarray]:
         raise ValueError('No provided implementation')
+    def viewRes(self)->List[np.ndarray]:
+        raise ValueError('No provided implementation')
 
 
 class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, just for benchmarking rife's performance on given platform
@@ -80,7 +82,7 @@ class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, ju
         return ret
     
 class RIFECoreLinked(RIFECore):
-    def __init__(self, model_dir, tha_core):
+    def __init__(self, model_dir, tha_core:THACore):
         super().__init__(model_dir, tha_core.memories['output_cv_img'])
         self.instream = tha_core.instream
         self.copystream = cuda.Stream() 
@@ -116,6 +118,11 @@ class RIFECoreLinked(RIFECore):
         self.returned = True
         ret = []
         self.finishedFetch.synchronize()
+        for i in range(self.scale):
+            ret.append(self.memories['framegen_'+str(i)].host)
+        return ret
+    def viewRes(self)->List[np.ndarray]:
+        ret = []
         for i in range(self.scale):
             ret.append(self.memories['framegen_'+str(i)].host)
         return ret

@@ -2,120 +2,53 @@ from ezvtb_rt.trt_utils import *
 from ezvtb_rt.rife import RIFECore, RIFECoreLinked
 from ezvtb_rt.tha import THACore
 from ezvtb_rt.cache import Cacher
-from ezvtb_rt.sr import SRLinked
+from ezvtb_rt.sr import SRCore
 
 class Core():
-    def __init__(self, tha_model_dir:str, rift_model_dir:str):
-        self.tha = THACore(tha_model_dir)
-        self.rife = RIFECore(rift_model_dir, latest_frame=self.tha.memories['output_cv_img'])
-        
-        self.updatestream = cuda.Stream()
-        self.instream = cuda.Stream()
-        self.outstream = cuda.Stream()
-        
-        self.rifeFinished = cuda.Event()
-        self.resultFetchFinished = cuda.Event()
-
-    def setImage(self, img:np.ndarray):
-        assert(len(img.shape) == 3 and 
-               img.shape[0] == 512 and 
-               img.shape[1] == 512 and 
-               img.shape[2] == 4
-               )
-        np.copyto(self.tha.memories['input_img'].host, img)
-        self.tha.memories['input_img'].htod(self.updatestream)
-        self.tha.decomposer.exec(self.updatestream)
-        self.updatestream.synchronize()
-
-    def inference(self, pose:np.ndarray) -> List[np.ndarray]: # Put input and get output of previous framegen
-
-        self.outstream.wait_for_event(self.rifeFinished)
-        for i in range(self.rife.scale):
-            self.rife.memories['framegen_'+str(i)].dtoh(self.outstream)
-
-        self.resultFetchFinished.record(self.outstream)
-
-        cuda.memcpy_dtod_async(self.rife.memories['old_frame'].device, self.tha.memories['output_cv_img'].device, 
-                               self.rife.memories['old_frame'].host.nbytes, self.instream)
-
-        np.copyto(self.tha.memories['eyebrow_pose'].host, pose[:, :12])
-        self.tha.memories['eyebrow_pose'].htod(self.instream)
-        np.copyto(self.tha.memories['face_pose'].host, pose[:,12:12+27])
-        self.tha.memories['face_pose'].htod(self.instream)
-        np.copyto(self.tha.memories['rotation_pose'].host, pose[:,12+27:])
-        self.tha.memories['rotation_pose'].htod(self.instream)
-
-        self.tha.combiner.exec(self.instream)
-        self.tha.morpher.exec(self.instream)
-        self.tha.rotator.exec(self.instream)
-        self.tha.editor.exec(self.instream)
-
-        self.instream.wait_for_event(self.resultFetchFinished)
-        self.rife.engine.exec(self.instream)
-        self.rifeFinished.record(self.instream)
-
-        self.resultFetchFinished.synchronize()
-
-        ret = []
-        for i in range(self.rife.scale):
-            ret.append(self.rife.memories['framegen_'+str(i)].host)
-        return ret
-
-class CoreCached():
-    def __init__(self, cached_tha_core:THACore, cacher:Cacher = None, sr:SRLinked = None, rife_core:RIFECoreLinked = None):
+    def __init__(self, cached_tha_core:THACore, cacher:Cacher = None, sr:SRCore = None, rife_core:RIFECoreLinked = None):
         self.tha = cached_tha_core
-        self.cacher = cacher
-        self.sr = sr
         self.rife = rife_core
+        self.sr = sr
+        self.cacher = cacher
     def setImage(self, img:np.ndarray):
         self.tha.setImage(img)
 
     def inference(self, pose:np.ndarray) -> List[np.ndarray]: #This numpy object should be copyed/used before next inference cycle
+        last_component = self.tha
+        if self.rife is not None:
+            last_component = self.rife
+        if self.sr is not None:
+            last_component = self.sr
+
         if self.cacher is None: #Optional to disable cacher
-            if self.rife is not None:
-                self.tha.inference(pose, False)
-                if self.sr is not None:
-                    self.sr.inference(False)
-                return self.rife.inference(True)
-            else:
-                if self.sr is None:
-                    return [self.tha.inference(pose,True)]
-                else:
-                    self.tha.inference(pose, False)
-                    return [self.sr.inference(True)]
-
-        hs = hash(str(pose))
-
-        cached = self.cacher.read(hs)
-
-        if self.rife is None: #optional to disable rife
-            if cached is None:
-                if self.sr is None:
-                    tha_res = self.tha.inference(pose, True)
-                    self.cacher.write(hs, tha_res)
-                    return [tha_res]
-                else:
-                    self.tha.inference(pose, False)
-                    sr_res = self.sr.inference(True)
-                    self.cacher.write(hs, sr_res)
-                    return [sr_res]
-            else:
-                if self.cacher.cache_quality != 100:
-                    cached[:,:,3] = self.tha.memories['output_cv_img'].host[:,:,3] if self.sr is None else self.sr.memories['output_cv_img'].host[:,:,3]
-                return [cached]
-
-        if cached is None:
             self.tha.inference(pose, False)
+            if self.rife is not None:
+                self.rife.inference(False)
             if self.sr is not None:
                 self.sr.inference(False)
-            self.rife.inference(False)
-            tha_res = self.tha.fetchRes() if self.sr is None else self.sr.fetchRes()
-            self.cacher.write(hs, tha_res)
-            return self.rife.fetchRes()
-        else:
+
+            return last_component.fetchRes()
+
+        hs = hash(str(pose))
+        cached = self.cacher.read(hs)
+
+        if cached is not None: #Cache hits
+            self.cacher.writeExecute()
             if self.cacher.cache_quality != 100:
-                self.rife.memories['latest_frame'].host[:,:,:3] = cached[:,:,:3]
-            else:
-                np.copyto(self.rife.memories['latest_frame'].host, cached)
-            self.rife.memories['latest_frame'].htod(self.rife.instream)
-            return self.rife.inference(True)
+                previous_res = last_component.viewRes()
+                assert(len(previous_res) == len(cached))
+                for i in range(len(previous_res)):
+                    cached[i][:,:,3] = previous_res[i][:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
+            return cached
+        
+        #Cache missed
+        self.tha.inference(pose, False)
+        if self.rife is not None:
+            self.rife.inference(False)
+        if self.sr is not None:
+            self.sr.inference(False)
+        self.cacher.writeExecute()
+        result = last_component.fetchRes()
+        self.cacher.write(hs, result)
+
+        return result
