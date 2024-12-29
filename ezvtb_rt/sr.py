@@ -80,7 +80,7 @@ class SRLinkTha(SRCore):
     
 
 class SRLinkRife(SRCore):
-    def __init__(self, model_dir, rife_core:RIFECoreLinked):
+    def __init__(self, model_dir:str, rife_core:RIFECoreLinked):
         self.instream = rife_core.instream
         self.scale = rife_core.scale
         self.fetchstream = cuda.Stream() 

@@ -2,6 +2,7 @@ import os
 import onnxruntime as ort
 import onnx
 import numpy as np
+from typing import List
 
 def merge_graph_all(tha_dir:str, seperable:bool):
     #merge all models into one
@@ -122,7 +123,7 @@ class THAORTCore:
         self.image_prepared.update_inplace(decomposed[2])
 
 
-    def inference(self, poses:np.ndarray) -> np.ndarray:
+    def inference(self, poses:np.ndarray) -> List[np.ndarray]:
         
         self.eyebrow_pose.update_inplace(poses[:, :12])
         self.face_pose.update_inplace(poses[:,12:12+27])
@@ -130,7 +131,7 @@ class THAORTCore:
 
         self.merged.run_with_iobinding(self.binding)
 
-        return self.result_image.numpy()
+        return [self.result_image.numpy()]
 
 
 class THAORTCoreNonDefault:
@@ -174,11 +175,11 @@ class THAORTCoreNonDefault:
     def update_image(self, img:np.ndarray):
         self.img = img
 
-    def inference(self, poses:np.ndarray):
+    def inference(self, poses:np.ndarray) -> List[np.ndarray]:
         return self.merged.run(None, {
             'decomposer_input_image':self.img,
             'combiner_eyebrow_pose': poses[:, :12],
             'morpher_face_pose':poses[:,12:12+27],
             'rotator_rotation_pose':poses[:,12+27:],
             'editor_rotation_pose':poses[:,12+27:],
-        })[0]
+        })

@@ -48,8 +48,8 @@ def CoreShow():
     sr_core = SRLinkTha('data\\Real-ESRGAN\\exported_256_fp16', tha_core)
     # sr_core = SRLinked('data\\waifu2x_upconv\\fp16\\upconv_7\\photo\\noise2_scale2x', tha_core)
     
-    cacher = Cacher(cache_quality=100, image_size=1024)
-    core = Core(tha_core, cacher, sr_core, None)
+    cacher = Cacher(cache_quality=90, image_size=512)
+    core = Core(tha_core, cacher, None, rife_core)
     core.setImage( cv2.imread('f:/talking-head-anime-3-demo/data/images/crypko_01.png', cv2.IMREAD_UNCHANGED))
 
     with open('./test/data/pose_20fps.json', 'r') as file:
@@ -72,16 +72,12 @@ def CoreShow():
     cuda.stop_profiler()
     for i in range(len(new_vid)):
         new_vid[i] = new_vid[i][:,:,:3] 
-    generate_video(new_vid, './test/data/core/test.mp4', 20)
+    generate_video(new_vid, './test/data/core/test.mp4', 80)
     if core.cacher is not None:
         print(core.cacher.hits, core.cacher.miss)
 
 
 if __name__ == "__main__":
     # check_build_all_models()
-    os.makedirs('./test/data/core', exist_ok=True)
-    db_path= './cacher.sqlite'
-    if os.path.exists(db_path):
-        os.remove(db_path)
     CoreShow()
-    CorePerf()
+    # CorePerf()

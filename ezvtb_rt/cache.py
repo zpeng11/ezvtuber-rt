@@ -13,33 +13,29 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
     cached_kbytes = 0
     while True:
         hs, data = queue.get(block=True)
-        collect = []
         if cache_quality == 100:
-            for item in data:
-                collect.append(np.array(item))
-                cached_kbytes += item.nbytes /1024
+            lock.acquire(blocking=True)
+            cache[hs] = data
+            lock.release()
+            cached_kbytes += data.nbytes /1024
             while cached_kbytes > max_kbytes:
                 lock.acquire(blocking=True)
                 poped = cache.popitem(last=False)
                 lock.release()
-                for item in poped[1]:
-                    cached_kbytes -= item.nbytes/1024
+                cached_kbytes -= poped[1].nbytes/1024
                 poped = None
         else:
-            for item in data:
-                compressed = turbojpeg.compress(item, cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
-                collect.append(compressed)
-                cached_kbytes += len(compressed) /1024
+            compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
+            lock.acquire(blocking=True)
+            cache[hs] = compressed
+            lock.release()
+            cached_kbytes += len(compressed) /1024
             while cached_kbytes > max_kbytes:
                 lock.acquire(blocking=True)
                 poped = cache.popitem(last=False)
                 lock.release()
-                for item in poped[1]:
-                    cached_kbytes -= len(item)/1024
+                cached_kbytes -= len(poped[1])/1024
                 poped = None
-        lock.acquire(blocking=True)
-        cache[hs] = collect
-        lock.release()
 
 
 class Cacher:
@@ -57,37 +53,26 @@ class Cacher:
         self.thread.start()
         self.temp_data = None
         self.continues_hits = 0
-    def read(self, hs:int) -> List[np.ndarray]:
+    def read(self, hs:int) -> np.ndarray:
         self.lock.acquire(blocking=True)
         cached = self.cache.get(hs)
         self.lock.release()
         if self.continues_hits > 5:
             cached = None
-        if cached is not None and len(cached)>0:
+        if cached is not None:
             self.hits += 1
             self.continues_hits += 1
             self.lock.acquire(blocking=True)
             self.cache.move_to_end(hs)
             self.lock.release()
             if self.cache_quality == 100:
-                imgs = cached
+                return cached
             else:
-                imgs = []
-                for item in cached:
-                    res = turbojpeg.decompress(item, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
-                    imgs.append(np.ndarray((self.image_size,self.image_size,4), dtype=np.uint8, buffer=res))
-            return imgs
+                res = turbojpeg.decompress(cached, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
+                return np.ndarray((self.image_size,self.image_size,4), dtype=np.uint8, buffer=res)
         else:
             self.miss += 1
             self.continues_hits = 0
             return None
-    def write(self, hs:int, data:List[np.ndarray]):
-        self.temp_data = (hs, data)
-    def writeExecute(self): #Copy is time consuming
-        if self.temp_data is None:
-            return
-        data_copied = []
-        for item in self.temp_data[1]:
-            data_copied.append(item.copy())
-        self.queue.put_nowait((self.temp_data[0], data_copied))
-        self.temp_data = None
+    def write(self, hs:int, data:np.ndarray):
+        self.queue.put_nowait((hs, data.copy()))

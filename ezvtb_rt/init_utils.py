@@ -29,13 +29,6 @@ def check_exist_all_models():
                 raise ValueError('Data is not prepared')
             onnx.checker.check_model(onnx_file)
             rife_list.append(onnx_file)
-    for rife_type in rife_types:
-        for rife_dtype in rife_dtypes:
-            onnx_file = os.path.join(data_dir, 'rife_1024',rife_type, rife_dtype+'.onnx')
-            if not os.path.isfile(onnx_file):
-                raise ValueError('Data is not prepared')
-            onnx.checker.check_model(onnx_file)
-            rife_list.append(onnx_file)
     tha_types = ['seperable', 'standard']
     tha_dtypes = ['fp32', 'fp16']
     tha_components = ['combiner.onnx', 'decomposer.onnx','editor.onnx', 'morpher.onnx', 'rotator.onnx']
@@ -50,7 +43,7 @@ def check_exist_all_models():
                 tha_list.append(onnx_file)
     real_esrgan_list = [os.path.join(data_dir,'Real-ESRGAN','exported_256_fp16.onnx'), os.path.join(data_dir,'Real-ESRGAN','exported_256.onnx')]
     waifu2x_dtypes = ['fp32','fp16']
-    waifu2x_train_sources = ['art', 'photo']
+    waifu2x_train_sources = ['photo']
     waifu2x_models = ['noise0_scale2x.onnx', 
                       'noise1_scale2x.onnx', 
                       'noise2_scale2x.onnx',

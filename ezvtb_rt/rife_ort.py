@@ -1,5 +1,6 @@
 import onnxruntime as ort
 import numpy as np
+from typing import List
 
 class RIFEORTCore:
     #We can not avoid copying in cpu with ort python api, so no need to use io binding
@@ -34,14 +35,14 @@ class RIFEORTCore:
         self.rife = ort.InferenceSession(rife_dir+".onnx", sess_options=options, providers=providers, provider_options=provider_options)
         self.previous_frame = None
 
-    def inference(self, img:np.ndarray):
+    def inference(self, img:List[np.ndarray]):
         if self.previous_frame is None:
-            self.previous_frame = img
+            self.previous_frame = img[0]
         ret = self.rife.run(None, {
             'tha_img_0': self.previous_frame,
-            'tha_img_1': img
+            'tha_img_1': img[0]
         })
-        self.previous_frame = img.copy()
+        self.previous_frame = np.array(img[0])
         return ret
 
         
