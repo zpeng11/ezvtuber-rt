@@ -43,7 +43,7 @@ def check_exist_all_models():
                 tha_list.append(onnx_file)
     real_esrgan_list = [os.path.join(data_dir,'Real-ESRGAN','exported_256_fp16.onnx'), os.path.join(data_dir,'Real-ESRGAN','exported_256.onnx')]
     waifu2x_dtypes = ['fp32','fp16']
-    waifu2x_train_sources = ['photo']
+    waifu2x_train_sources = ['art']
     waifu2x_models = ['noise0_scale2x.onnx', 
                       'noise1_scale2x.onnx', 
                       'noise2_scale2x.onnx',

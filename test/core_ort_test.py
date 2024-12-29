@@ -14,9 +14,8 @@ import cv2
 
   
 def CoreORTPerf():
-    cacher = Cacher()
-    core = CoreORTCached('./data/tha3/seperable/fp32', './data/rife_512/x3/fp32', cacher=cacher)
-    core.setImage( cv2.imread('./test/data/base.png', cv2.IMREAD_UNCHANGED))
+    core = CoreORT('./data/tha3/seperable/fp32', rife_path='./data/rife_512/x4/fp32', device_id=1)#, cacher=Cacher(image_size=512), sr_path='data\\Real-ESRGAN\\exported_256_fp16', rife_path='./data/rife_512/x2/fp32',  device_id=1, cacher=Cacher(image_size=1024))
+    core.setImage( cv2.imread('f:/talking-head-anime-3-demo/data/images/crypko_01.png', cv2.IMREAD_UNCHANGED))
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
     for pose in tqdm(pose_data):
@@ -55,5 +54,5 @@ def CoreORTTestShow():
 
 if __name__ == "__main__":
     # check_exist_all_models()
-    # CoreORTPerf()
+    CoreORTPerf()
     CoreORTTestShow()

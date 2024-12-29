@@ -78,6 +78,6 @@ def CoreShow():
 
 
 if __name__ == "__main__":
-    # check_build_all_models()
+    check_build_all_models()
     CoreShow()
-    # CorePerf()
+    CorePerf()
