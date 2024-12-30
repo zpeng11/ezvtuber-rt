@@ -28,7 +28,7 @@ def CoreORTPerf():
             item.copy()
 
 def CoreORTTestShow():
-    core = CoreORT('./data/tha3/seperable/fp32', rife_path='./data/rife_512/x4/fp32', device_id=1)#, cacher=Cacher(image_size=512), sr_path='data\\Real-ESRGAN\\exported_256_fp16', rife_path='./data/rife_512/x2/fp32',  device_id=1, cacher=Cacher(image_size=1024))
+    core = CoreORT('./data/tha3/seperable/fp16',sr_path='data\\Real-ESRGAN\\exported_256_fp16', device_id=1, cacher=Cacher(image_size=512))#, sr_path='data\\Real-ESRGAN\\exported_256_fp16', rife_path='./data/rife_512/x2/fp32',  device_id=1, cacher=Cacher(image_size=1024))
     core.setImage( cv2.imread('f:/talking-head-anime-3-demo/data/images/crypko_01.png', cv2.IMREAD_UNCHANGED))
     with open('./test/data/pose_20fps.json', 'r') as file:
         pose_data = json.load(file)
@@ -46,7 +46,7 @@ def CoreORTTestShow():
         return new_vid
     
     vid = createInterpolatedVideo(pose_data[800:1000], core)
-    generate_video(vid, './test/data/core_ort/test.mp4', 80)
+    generate_video(vid, './test/data/core_ort/test.mp4', 20)
     if core.cacher is not None:
         print(core.cacher.hits, core.cacher.miss)
 
@@ -54,5 +54,5 @@ def CoreORTTestShow():
 
 if __name__ == "__main__":
     # check_exist_all_models()
-    CoreORTPerf()
+    # CoreORTPerf()
     CoreORTTestShow()

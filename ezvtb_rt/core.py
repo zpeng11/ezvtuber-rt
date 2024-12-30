@@ -40,18 +40,26 @@ class Core():
         cached = self.cacher.read(hs)
 
         if cached is not None: #Cache hits
-            if self.rife is None:
+            
+            if self.rife is not None:
                 if self.cacher.cache_quality != 100:
-                    previous_res = self.tha.viewRes() if self.sr is None else self.sr.viewRes()
-                    cached[:,:,3] = previous_res[0][:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
-                return [cached]
-            else: # There is rife
-                if self.cacher.cache_quality != 100:
-                    self.rife.memories['latest_frame'].host[:,:,:3] = cached[:,:,:3]
+                    self.tha.memories['output_cv_img'].host[:,:,:3] = cached[:,:,:3]
                 else:
-                    np.copyto(self.rife.memories['latest_frame'].host, cached)
-                self.rife.memories['latest_frame'].htod(self.rife.instream)
+                    np.copyto(self.tha.memories['output_cv_img'].host, cached)
+                self.tha.memories['output_cv_img'].htod(self.tha.instream)
                 return self.rife.inference(True)
+            elif self.sr is not None:
+                if self.cacher.cache_quality != 100:
+                    self.tha.memories['output_cv_img'].host[:,:,:3] = cached[:,:,:3]
+                else:
+                    np.copyto(self.tha.memories['output_cv_img'].host, cached)
+                self.tha.memories['output_cv_img'].htod(self.tha.instream)
+                return self.sr.inference(True)
+            else:
+                if self.cacher.cache_quality != 100:
+                    tha_res = self.tha.viewRes() 
+                    cached[:,:,3] = tha_res[0][:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
+                return [cached]
 
         
         #Cache missed
@@ -62,9 +70,10 @@ class Core():
             self.cacher.write(hs, tha_res)
             return self.rife.fetchRes()
         elif self.sr is not None:
-            sr_res = self.sr.inference(True)[0]
-            self.cacher.write(hs, sr_res)
-            return [sr_res]
+            self.sr.inference(False)
+            tha_res = self.tha.fetchRes()[0]
+            self.cacher.write(hs, tha_res)
+            return self.sr.fetchRes()
         else:
             tha_res = self.tha.fetchRes()[0]
             self.cacher.write(hs, tha_res)

@@ -43,23 +43,21 @@ class CoreORT:
         if cached is not None:# Cache hits
             if self.cacher.cache_quality != 100:
                 cached[:,:,3] = self.last_res[:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
-            if self.rife is None:
-                return [cached]
-            else: # There is rife
+
+            if self.rife is not None: # There is rife
                 return self.rife.inference([cached])
+            elif self.sr is not None:
+                return self.sr.inference([cached])
+            else:
+                return [cached]
 
         else: #cache missed
             res = self.tha.inference(pose)
+            self.cacher.write(hs, res[0])
+            self.last_res = res[0]
             if self.rife is not None:
-                self.cacher.write(hs, res[0])
-                self.last_res = res[0]
                 res = self.rife.inference(res)
             elif self.sr is not None:
                 res = self.sr.inference(res)
-                self.cacher.write(hs, res[0])
-                self.last_res = res[0]
-            else:
-                self.cacher.write(hs, res[0])
-                self.last_res = res[0]
             return res
 
