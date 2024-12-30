@@ -13,6 +13,11 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
     cached_kbytes = 0
     while True:
         hs, data = queue.get(block=True)
+        lock.acquire(blocking=True)
+        cached = cache.get(hs)
+        lock.release()
+        if cached is not None:
+            continue
         if cache_quality == 100:
             lock.acquire(blocking=True)
             cache[hs] = data
@@ -53,6 +58,7 @@ class Cacher:
         self.thread.start()
         self.temp_data = None
         self.continues_hits = 0
+        self.last_hs = -1
     def read(self, hs:int) -> np.ndarray:
         self.lock.acquire(blocking=True)
         cached = self.cache.get(hs)
@@ -60,8 +66,12 @@ class Cacher:
         if self.continues_hits > 5:
             cached = None
         if cached is not None:
+            if self.last_hs != hs:
+                self.continues_hits += 1
+            else:
+                self.continues_hits = 0
+            self.last_hs = hs
             self.hits += 1
-            self.continues_hits += 1
             self.lock.acquire(blocking=True)
             self.cache.move_to_end(hs)
             self.lock.release()
@@ -73,6 +83,7 @@ class Cacher:
         else:
             self.miss += 1
             self.continues_hits = 0
+            self.last_hs = hs
             return None
     def write(self, hs:int, data:np.ndarray):
         self.queue.put_nowait((hs, data.copy()))
