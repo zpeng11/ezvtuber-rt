@@ -5,6 +5,11 @@ import numpy as np
 from typing import List
 
 def merge_graph_all(tha_dir:str, seperable:bool):
+    try:
+        onnx.checker.check_model(os.path.join(tha_dir, 'merge_all.onnx'))
+        return
+    except:
+        pass
     #merge all models into one
     decomposer = onnx.load(os.path.join(tha_dir, 'decomposer.onnx'))
     decomposer = onnx.compose.add_prefix(decomposer,'decomposer_')
@@ -34,6 +39,11 @@ def merge_graph_all(tha_dir:str, seperable:bool):
     onnx.save_model(merged, os.path.join(tha_dir, 'merge_all.onnx'))
 
 def merge_graph(tha_dir:str, seperable:bool):
+    try:
+        onnx.checker.check_model(os.path.join(tha_dir, 'merge.onnx'))
+        return
+    except:
+        pass
     #Merge models except for decomposer
     combiner = onnx.load(os.path.join(tha_dir, 'combiner.onnx'))
     combiner = onnx.compose.add_prefix(combiner,'combiner_')
