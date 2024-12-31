@@ -21,8 +21,8 @@ def cudaSetDevice(device_idx):
         error_string = libcudart.cudaGetErrorString(ret)
         raise RuntimeError("cudaSetDevice: " + str(error_string))
 
-def check_build_all_models() -> bool:
-    all_models_list = check_exist_all_models()
+def check_build_all_models(data_dir:str = '') -> bool:
+    all_models_list = check_exist_all_models(data_dir)
     #Check TRT support
     print('Start testing if TensorRT works on this machine')
     try:

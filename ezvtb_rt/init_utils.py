@@ -3,21 +3,20 @@ import os
 import urllib.request
 import shutil
 
-def prepare_download_models():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(dir_path, '..','data')
+def prepare_download_models(data_dir:str):
     print('Downloading pretrained models...')
     zip_path = 'https://github.com/zpeng11/ezvtuber-rt/releases/download/0.0.1/20241220.zip'
     filehandle, _ = urllib.request.urlretrieve(zip_path)
     os.rename(filehandle, filehandle + '.zip')
     shutil.unpack_archive(filehandle + '.zip' , data_dir)
 
-def check_exist_all_models():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    data_dir = os.path.join(dir_path, '..','data')
+def check_exist_all_models(data_dir:str = ''):
+    if data_dir == '':
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        data_dir = os.path.join(dir_path, '..','data')
 
     if not os.path.exists(os.path.join(data_dir, 'tha3')):
-        prepare_download_models()
+        prepare_download_models(data_dir)
 
     rife_types = ['x2','x3','x4']
     rife_dtypes = ['fp32','fp16']
