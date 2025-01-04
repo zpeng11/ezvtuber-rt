@@ -30,11 +30,16 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
                 cached_kbytes -= poped[1].nbytes/1024
                 poped = None
         else:
-            compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y420,fastdct = True, optimize= True, pixelformat=turbojpeg.BGRA)
+            compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y422, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
+            alpha_channel = np.expand_dims(data[:,:,3], axis = 2)
+            print(alpha_channel.shape)
+            alpha_image = np.concatenate((alpha_channel,alpha_channel,alpha_channel), axis=2)
+            compressed_alpha = turbojpeg.compress(alpha_image, 70, turbojpeg.SAMP.Y420, fastdct = False, optimize= True, pixelformat=turbojpeg.BGR)
             lock.acquire(blocking=True)
-            cache[hs] = compressed
+            cache[hs] = (compressed,compressed_alpha)
             lock.release()
             cached_kbytes += len(compressed) /1024
+            cached_kbytes += len(compressed_alpha) /1024
             while cached_kbytes > max_kbytes:
                 lock.acquire(blocking=True)
                 poped = cache.popitem(last=False)
@@ -78,8 +83,12 @@ class Cacher:
             if self.cache_quality == 100:
                 return cached
             else:
-                res = turbojpeg.decompress(cached, fastdct = True, fastupsample=True, pixelformat=turbojpeg.BGRA)
-                return np.ndarray((self.image_size,self.image_size,4), dtype=np.uint8, buffer=res)
+                res = turbojpeg.decompress(cached[0], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGRA)
+                img =  np.ndarray((self.image_size,self.image_size,4), dtype=np.uint8, buffer=res)
+                res_alpha = turbojpeg.decompress(cached[1], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGR)
+                alpha_img = np.ndarray((self.image_size,self.image_size,3), dtype=np.uint8, buffer=res_alpha)
+                img[:,:,3] = alpha_img[:,:,0]
+                return img
         else:
             self.miss += 1
             self.continues_hits = 0

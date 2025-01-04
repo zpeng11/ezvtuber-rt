@@ -22,7 +22,6 @@ class CoreORT:
             self.rife = None
             self.sr = None
         self.cacher = cacher
-        self.last_res = None
     def setImage(self, img:np.ndarray):
         self.tha.update_image(img)
     def inference(self, pose:np.ndarray) -> List[np.ndarray]:
@@ -41,9 +40,6 @@ class CoreORT:
         cached = self.cacher.read(hs)
 
         if cached is not None:# Cache hits
-            if self.cacher.cache_quality != 100:
-                cached[:,:,3] = self.last_res[:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
-
             if self.rife is not None: # There is rife
                 return self.rife.inference([cached])
             elif self.sr is not None:
@@ -54,7 +50,6 @@ class CoreORT:
         else: #cache missed
             res = self.tha.inference(pose)
             self.cacher.write(hs, res[0])
-            self.last_res = res[0]
             if self.rife is not None:
                 res = self.rife.inference(res)
             elif self.sr is not None:

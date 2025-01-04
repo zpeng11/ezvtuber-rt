@@ -42,23 +42,14 @@ class Core():
         if cached is not None: #Cache hits
             
             if self.rife is not None:
-                if self.cacher.cache_quality != 100:
-                    self.tha.memories['output_cv_img'].host[:,:,:3] = cached[:,:,:3]
-                else:
-                    np.copyto(self.tha.memories['output_cv_img'].host, cached)
+                np.copyto(self.tha.memories['output_cv_img'].host, cached)
                 self.tha.memories['output_cv_img'].htod(self.tha.instream)
                 return self.rife.inference(True)
             elif self.sr is not None:
-                if self.cacher.cache_quality != 100:
-                    self.tha.memories['output_cv_img'].host[:,:,:3] = cached[:,:,:3]
-                else:
-                    np.copyto(self.tha.memories['output_cv_img'].host, cached)
+                np.copyto(self.tha.memories['output_cv_img'].host, cached)
                 self.tha.memories['output_cv_img'].htod(self.tha.instream)
                 return self.sr.inference(True)
             else:
-                if self.cacher.cache_quality != 100:
-                    tha_res = self.tha.viewRes() 
-                    cached[:,:,3] = tha_res[0][:,:,3] #Use alpha channel from previous-calculated result because cacher does not store alpha if using turbojpeg
                 return [cached]
 
         
