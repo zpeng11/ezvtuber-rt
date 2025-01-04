@@ -32,7 +32,6 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
         else:
             compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y422, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
             alpha_channel = np.expand_dims(data[:,:,3], axis = 2)
-            print(alpha_channel.shape)
             alpha_image = np.concatenate((alpha_channel,alpha_channel,alpha_channel), axis=2)
             compressed_alpha = turbojpeg.compress(alpha_image, 70, turbojpeg.SAMP.Y420, fastdct = False, optimize= True, pixelformat=turbojpeg.BGR)
             lock.acquire(blocking=True)
