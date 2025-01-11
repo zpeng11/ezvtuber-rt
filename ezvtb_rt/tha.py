@@ -144,6 +144,9 @@ class VRAMCacher(object):
         self.cache = OrderedDict()
         self.hits = 0
         self.miss = 0
+        if max_size <= 0:
+            self.single_mem = (VRAMMem(nbytes1), VRAMMem(nbytes2))
+            self.max_size = max_size
     def query(self, hs:int)->bool:
         cached = self.cache.get(hs)
         if cached is not None:
@@ -160,6 +163,8 @@ class VRAMCacher(object):
             self.miss += 1
             return None
     def write_mem_set(self, hs:int)->set[VRAMMem, VRAMMem]:
+        if self.max_size <= 0:
+            return self.single_mem
         if len(self.pool) != 0:
             mem_set = self.pool.pop()
         else:
@@ -168,14 +173,19 @@ class VRAMCacher(object):
         return mem_set
 
 class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
-    def __init__(self, model_dir, vram_cache_size:float = 1.0):
+    def __init__(self, model_dir, vram_cache_size:float = 1.0, use_eyebrow:bool = True):
         super().__init__(model_dir)
-        self.combiner_cacher = VRAMCacher(self.memories['eyebrow_image'].host.nbytes, 
-                                          self.memories['morpher_decoded'].host.nbytes, 
-                                          0.1 * vram_cache_size)
+        if use_eyebrow:
+            self.combiner_cacher = VRAMCacher(self.memories['eyebrow_image'].host.nbytes, 
+                                            self.memories['morpher_decoded'].host.nbytes, 
+                                            0.1 * vram_cache_size)
+        else:
+            self.combiner_cacher = None
+        
         self.morpher_cacher = VRAMCacher(self.memories['face_morphed_full'].host.nbytes,
                                          self.memories['face_morphed_half'].host.nbytes,
-                                         0.9 * vram_cache_size)
+                                         (0.9 if use_eyebrow else 1.0) * vram_cache_size)
+        self.use_eyebrow = use_eyebrow
         self.returned = False
         # create stream
         self.updatestream = cuda.Stream()
@@ -196,6 +206,10 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         np.copyto(self.memories['input_img'].host, img)
         self.memories['input_img'].htod(self.updatestream)
         self.decomposer.exec(self.updatestream)
+        if not self.use_eyebrow:
+            self.memories['eyebrow_pose'].host[:,:] = 0.0
+            self.memories['eyebrow_pose'].htod(self.updatestream)
+            self.combiner.exec(self.updatestream)
         self.updatestream.synchronize()
 
     def inference(self, pose:np.ndarray, return_now:bool=False) -> List[np.ndarray]: #This inference is running in a synchronized way
@@ -209,7 +223,10 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
         morpher_hash = hash(str(pose[0,:12+27]))
         morpher_cached = self.morpher_cacher.read_mem_set(morpher_hash)
         combiner_hash = hash(str(pose[0,:12]))
-        combiner_cached = self.combiner_cacher.read_mem_set(combiner_hash)
+        if self.use_eyebrow:
+            combiner_cached = self.combiner_cacher.read_mem_set(combiner_hash)
+        else:
+            combiner_cached = None
 
         self.cachestream.synchronize()
         self.outstream.synchronize()
@@ -221,12 +238,13 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
             self.finishedExec.record(self.instream)
-        elif(combiner_cached is not None):
+        elif(combiner_cached is not None or not self.use_eyebrow):
             #prepare input
-            cuda.memcpy_dtod_async(self.memories['eyebrow_image'].device, combiner_cached[0].device, 
-                                   self.memories['eyebrow_image'].host.nbytes, self.instream)
-            cuda.memcpy_dtod_async(self.memories['morpher_decoded'].device, combiner_cached[1].device, 
-                                   self.memories['morpher_decoded'].host.nbytes, self.instream)
+            if self.use_eyebrow:
+                cuda.memcpy_dtod_async(self.memories['eyebrow_image'].device, combiner_cached[0].device, 
+                                    self.memories['eyebrow_image'].host.nbytes, self.instream)
+                cuda.memcpy_dtod_async(self.memories['morpher_decoded'].device, combiner_cached[1].device, 
+                                    self.memories['morpher_decoded'].host.nbytes, self.instream)
             np.copyto(self.memories['face_pose'].host, face_pose)
             self.memories['face_pose'].htod(self.instream)
             
@@ -303,7 +321,7 @@ class THACoreCachedVRAM(THACore): #Cached implementation of tensorrt tha core
 
 
 class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
-    def __init__(self, model_dir, ram_cache_size:float = 2.0):
+    def __init__(self, model_dir, ram_cache_size:float = 2.0, use_eyebrow:bool = True):
         super().__init__(model_dir)
         self.cache = OrderedDict()
         self.cached_kbytes = 0
@@ -312,6 +330,7 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         self.combiner_cache_kbytes = (self.memories['eyebrow_image'].host.nbytes + self.memories['morpher_decoded'].host.nbytes)//1024
         self.hits = 0
         self.miss = 0
+        self.use_eyebrow = use_eyebrow
         # create stream
         self.updatestream = cuda.Stream()
         self.instream = cuda.Stream()
@@ -333,6 +352,10 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
         np.copyto(self.memories['input_img'].host, img)
         self.memories['input_img'].htod(self.updatestream)
         self.decomposer.exec(self.updatestream)
+        if not self.use_eyebrow:
+            self.memories['eyebrow_pose'].host[:,:] = 0.0
+            self.memories['eyebrow_pose'].htod(self.updatestream)
+            self.combiner.exec(self.updatestream)
         self.updatestream.synchronize()
 
     def inference(self, pose:np.ndarray, return_now:bool = False) -> List[np.ndarray]: #This inference is running in a synchronized way
@@ -360,14 +383,15 @@ class THACoreCachedRAM(THACore): #Cached implementation of tensorrt tha core
             self.rotator.exec(self.instream)
             self.editor.exec(self.instream)
             self.finishedExec.record(self.instream)
-        elif(combiner_cached is not None):
-            self.hits += 1
-            self.cache.move_to_end(combiner_hash)
-            #prepare input
-            np.copyto(self.memories['eyebrow_image'].host, combiner_cached[0])
-            self.memories['eyebrow_image'].htod(self.instream)
-            np.copyto(self.memories['morpher_decoded'].host, combiner_cached[1])
-            self.memories['morpher_decoded'].htod(self.instream)
+        elif(combiner_cached is not None or not self.use_eyebrow):
+            if self.use_eyebrow:
+                self.hits += 1
+                self.cache.move_to_end(combiner_hash)
+                #prepare input
+                np.copyto(self.memories['eyebrow_image'].host, combiner_cached[0])
+                self.memories['eyebrow_image'].htod(self.instream)
+                np.copyto(self.memories['morpher_decoded'].host, combiner_cached[1])
+                self.memories['morpher_decoded'].htod(self.instream)
             
             np.copyto(self.memories['face_pose'].host, face_pose)
             self.memories['face_pose'].htod(self.instream)

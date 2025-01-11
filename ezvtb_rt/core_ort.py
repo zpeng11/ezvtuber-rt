@@ -7,11 +7,11 @@ from ezvtb_rt.cache import Cacher
 from ezvtb_rt.sr_ort import SRORTCore
     
 class CoreORT:
-    def __init__(self, tha_path:str, rife_path:str = None, sr_path:str = None, device_id:int = 0, cacher:Cacher = None):
+    def __init__(self, tha_path:str, rife_path:str = None, sr_path:str = None, device_id:int = 0, cacher:Cacher = None, use_eyebrow:bool = True):
         if device_id == 0:
-            self.tha = THAORTCore(tha_path)
+            self.tha = THAORTCore(tha_path, use_eyebrow)
         else:
-            self.tha = THAORTCoreNonDefault(tha_path, device_id)
+            self.tha = THAORTCoreNonDefault(tha_path, device_id, use_eyebrow)
         if rife_path is not None:
             self.rife = RIFEORTCore(rife_path, device_id)
             self.sr = None
