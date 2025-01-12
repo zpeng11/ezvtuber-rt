@@ -146,7 +146,7 @@ class VRAMCacher(object):
         self.miss = 0
         if max_size <= 0:
             self.single_mem = (VRAMMem(nbytes1), VRAMMem(nbytes2))
-            self.max_size = max_size
+        self.max_size = max_size
     def query(self, hs:int)->bool:
         cached = self.cache.get(hs)
         if cached is not None:
