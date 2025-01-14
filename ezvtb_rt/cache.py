@@ -9,7 +9,7 @@ import threading
 
 
 def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_size:int, cache_quality:int):
-    max_kbytes = max_size * 1024 * 1024
+    max_kbytes = 1024
     cached_kbytes = 0
     while True:
         hs, data = queue.get(block=True)
@@ -18,40 +18,25 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
         lock.release()
         if cached is not None:
             continue
+        new_data = np.zeros((1024, 512, 4), data.dtype)
+        new_data[:512, :, :] = data
+        new_data[512:, :, 0] = data[:,:,3]
+
         if cache_quality == 100:
-            compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y444, lossless = True, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
-            alpha_channel = np.expand_dims(data[:,:,3], axis = 2)
-            alpha_image = np.concatenate((alpha_channel,alpha_channel,alpha_channel), axis=2)
-            compressed_alpha = turbojpeg.compress(alpha_image, 70, turbojpeg.SAMP.Y420, fastdct = False, optimize= True, pixelformat=turbojpeg.BGR)
-            lock.acquire(blocking=True)
-            cache[hs] = (compressed, compressed_alpha)
-            lock.release()
-            cached_kbytes += len(compressed) /1024
-            cached_kbytes += len(compressed_alpha) /1024
-            while cached_kbytes > max_kbytes:
-                lock.acquire(blocking=True)
-                poped = cache.popitem(last=False)
-                lock.release()
-                cached_kbytes -= poped[1][0].nbytes/1024
-                cached_kbytes -= poped[1][1].nbytes/1024
-                poped = None
+            compressed = turbojpeg.compress(new_data, cache_quality, turbojpeg.SAMP.Y420, lossless = True, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
         else:
-            compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y422, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
-            alpha_channel = np.expand_dims(data[:,:,3], axis = 2)
-            alpha_image = np.concatenate((alpha_channel,alpha_channel,alpha_channel), axis=2)
-            compressed_alpha = turbojpeg.compress(alpha_image, 70, turbojpeg.SAMP.Y420, fastdct = False, optimize= True, pixelformat=turbojpeg.BGR)
+            compressed = turbojpeg.compress(new_data, cache_quality, turbojpeg.SAMP.Y444, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
+        lock.acquire(blocking=True)
+        cache[hs] = compressed
+        lock.release()
+        print(len(compressed))
+        cached_kbytes += len(compressed) /1024
+        while cached_kbytes > max_kbytes:
             lock.acquire(blocking=True)
-            cache[hs] = (compressed,compressed_alpha)
+            poped = cache.popitem(last=False)
             lock.release()
-            cached_kbytes += len(compressed) /1024
-            cached_kbytes += len(compressed_alpha) /1024
-            while cached_kbytes > max_kbytes:
-                lock.acquire(blocking=True)
-                poped = cache.popitem(last=False)
-                lock.release()
-                cached_kbytes -= len(poped[1][0])/1024
-                cached_kbytes -= len(poped[1][1])/1024
-                poped = None
+            cached_kbytes -= len(poped[1])/1024
+            poped = None
 
 
 class Cacher:
@@ -86,16 +71,11 @@ class Cacher:
             self.lock.acquire(blocking=True)
             self.cache.move_to_end(hs)
             self.lock.release()
-            if self.cache_quality == 100:
-                res = turbojpeg.decompress(cached[0], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGRA)
-                res_alpha = turbojpeg.decompress(cached[1], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGR)
-            else:
-                res = turbojpeg.decompress(cached[0], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGRA)
-                res_alpha = turbojpeg.decompress(cached[1], fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGR)
-            img =  np.ndarray((self.image_size,self.image_size,4), dtype=np.uint8, buffer=res)
-            alpha_img = np.ndarray((self.image_size,self.image_size,3), dtype=np.uint8, buffer=res_alpha)
-            img[:,:,3] = alpha_img[:,:,0]
-            return img
+            res = turbojpeg.decompress(cached, fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGRA)
+            decompressed_img =  np.ndarray((1024,512,4), dtype=np.uint8, buffer=res)
+            result_img = decompressed_img[:512,:,:]
+            result_img[:,:,3] = decompressed_img[512:,:,0]
+            return result_img
         else:
             self.miss += 1
             self.continues_hits = 0
