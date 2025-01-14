@@ -9,7 +9,7 @@ import threading
 
 
 def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_size:int, cache_quality:int):
-    max_kbytes = 1024
+    max_kbytes = max_size * 1024 * 1024
     cached_kbytes = 0
     while True:
         hs, data = queue.get(block=True)
