@@ -29,7 +29,6 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
         lock.acquire(blocking=True)
         cache[hs] = compressed
         lock.release()
-        print(len(compressed))
         cached_kbytes += len(compressed) /1024
         while cached_kbytes > max_kbytes:
             lock.acquire(blocking=True)
