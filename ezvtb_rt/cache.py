@@ -32,7 +32,8 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
                 lock.acquire(blocking=True)
                 poped = cache.popitem(last=False)
                 lock.release()
-                cached_kbytes -= poped[1].nbytes/1024
+                cached_kbytes -= poped[1][0].nbytes/1024
+                cached_kbytes -= poped[1][1].nbytes/1024
                 poped = None
         else:
             compressed = turbojpeg.compress(data, cache_quality, turbojpeg.SAMP.Y422, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
@@ -48,7 +49,8 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
                 lock.acquire(blocking=True)
                 poped = cache.popitem(last=False)
                 lock.release()
-                cached_kbytes -= len(poped[1])/1024
+                cached_kbytes -= len(poped[1][0])/1024
+                cached_kbytes -= len(poped[1][1])/1024
                 poped = None
 
 
