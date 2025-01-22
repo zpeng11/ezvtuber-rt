@@ -15,13 +15,10 @@ class RIFECore:
             raise ValueError('can not determine scale')
         TRT_LOGGER.log(TRT_LOGGER.INFO, f'RIFE scale {self.scale}')
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating RIFE engine')
-        self.prepareEngines(model_dir)
+        self.engine = Engine(model_dir, 2)
         self.prepareMemories(latest_frame)
         self.setMemsToEngines()
 
-    def prepareEngines(self, model_dir:str): #inherit and pass different engine type
-        head_tail = os.path.split(model_dir)
-        self.engine = Engine(head_tail[0], head_tail[1], 2)
     def prepareMemories(self, latest_frame:HostDeviceMem): 
         self.memories = {}
         self.memories['old_frame'] = createMemory(self.engine.inputs[0])
@@ -31,13 +28,14 @@ class RIFECore:
             self.memories['latest_frame'] = latest_frame
         for i in range(self.scale):
             self.memories['framegen_'+str(i)] = createMemory(self.engine.outputs[i])
+
     def setMemsToEngines(self):
         self.engine.setInputMems([self.memories['old_frame'], self.memories['latest_frame']])
         outputs = [self.memories['framegen_'+str(i)] for i in range(self.scale)]
         self.engine.setOutputMems(outputs)
-    def inference(self, return_now:bool) -> List[np.ndarray]:
+    def inference(self):
         raise ValueError('No provided implementation')
-    def fetchRes(self)->List[np.ndarray]:
+    def SyncfetchRes(self)->List[np.ndarray]:
         raise ValueError('No provided implementation')
     def viewRes(self)->List[np.ndarray]:
         raise ValueError('No provided implementation')
@@ -101,26 +99,14 @@ class RIFECoreLinked(RIFECore):
         self.finishedFetch.record(self.copystream)
         cuda.memcpy_dtod_async(self.memories['old_frame'].device, self.memories['latest_frame'].device, 
                                    self.memories['latest_frame'].host.nbytes, self.copystream)
-        self.returned = False
 
-        if return_now:
-            self.returned = True
-            ret = []
-            self.finishedFetch.synchronize()
-            for i in range(self.scale):
-                ret.append(self.memories['framegen_'+str(i)].host)
-            return ret
-        else:
-            return None
-    def fetchRes(self)->List[np.ndarray]:
-        if self.returned == True:
-            raise ValueError('Already fetched result')
-        self.returned = True
+    def SyncfetchRes(self)->List[np.ndarray]:
         ret = []
         self.finishedFetch.synchronize()
         for i in range(self.scale):
             ret.append(self.memories['framegen_'+str(i)].host)
         return ret
+
     def viewRes(self)->List[np.ndarray]:
         ret = []
         for i in range(self.scale):

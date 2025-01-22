@@ -11,11 +11,11 @@ class THACore:
 
     def prepareEngines(self, model_dir):
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating Engines')
-        self.decomposer = Engine(model_dir, 'decomposer', 1)
-        self.combiner = Engine(model_dir, 'combiner', 4)
-        self.morpher = Engine(model_dir, 'morpher', 4)
-        self.rotator = Engine(model_dir, 'rotator', 2)
-        self.editor = Engine(model_dir, 'editor', 4)
+        self.decomposer = Engine(join(model_dir, 'decomposer.trt'), 1)
+        self.combiner = Engine(join(model_dir, 'combiner.trt'), 4)
+        self.morpher = Engine(join(model_dir, 'morpher.trt'), 4)
+        self.rotator = Engine(join(model_dir, 'rotator.trt'), 2)
+        self.editor = Engine(join(model_dir, 'editor.trt'), 4)
 
     def prepareMemories(self):
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating memories on VRAM')

@@ -19,11 +19,9 @@ def createMemory(nodeInfo : NodeInfo):
     return HostDeviceMem(host_mem, device_mem)
 
 class Engine:
-    def __init__(self, model_dir:str, model_component:str, n_inputs:int):
-        TRT_LOGGER.log(TRT_LOGGER.WARNING, f'Loading engine from file {join(model_dir, model_component)}')
-        self.engine = get_trt_engine(model_dir, model_component)
-        assert(self.engine is not None)
-        TRT_LOGGER.log(TRT_LOGGER.INFO, 'Completed loading engine')
+    def __init__(self, model_path:str, n_inputs:int):
+        self.engine = load_engine(model_path)
+        assert(self.engine is not None) #TRT model built error, can not load
 
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating inference context')
         self.context = self.engine.create_execution_context()
