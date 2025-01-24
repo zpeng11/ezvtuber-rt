@@ -68,7 +68,7 @@ def merge_graph(tha_dir:str, seperable:bool, use_eyebrow:bool = True):
                                                          decoded_cut])
     onnx.save_model(merged, os.path.join(tha_dir, 'merge.onnx' if use_eyebrow else 'merge_no_eyebrow.onnx'))
 
-class THAORTCore:
+class THAORT:
     def __init__(self, tha_dir:str, use_eyebrow:bool = True):
         self.tha_dir = tha_dir
         if 'fp16' in tha_dir:
@@ -169,7 +169,7 @@ class THAORTCore:
         return [self.result_image.numpy()]
 
 
-class THAORTCoreNonDefault:
+class THAORTNonDefault:
     #Interesting bug in onnxruntime that ortValue with dml only support default device (device=0), 
     #Which means when using a nondefault ORT device, we can not use any vram cache but have to merge graph to reduce passage through pcie boundary
     def __init__(self, tha_dir:str, device_id:int, use_eyebrow = True):

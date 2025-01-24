@@ -5,7 +5,7 @@ from ezvtb_rt.trt_utils import check_build_all_models
 from ezvtb_rt.core import Core
 from ezvtb_rt.cache import Cacher
 from ezvtb_rt.rife import RIFECoreLinked
-from ezvtb_rt.tha import THACoreCachedRAM, THACoreCachedVRAM
+from ezvtb_rt.tha import THACoreCachedVRAM
 from ezvtb_rt.sr import SRLinkRife, SRLinkTha
 import numpy as np
 import pycuda.driver as cuda

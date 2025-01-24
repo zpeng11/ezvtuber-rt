@@ -1,11 +1,9 @@
-import os
 from ezvtb_rt.trt_utils import *
-from ezvtb_rt.engine import Engine, createMemory
+from ezvtb_rt.engine import Engine, createMemory, HostDeviceMem
 import numpy as np
-from ezvtb_rt.tha import THACore
-from ezvtb_rt.rife import RIFECoreLinked
 
-class SR():
+
+class SRSimple():
     def __init__(self, model_dir):
         self.instream = cuda.Stream()
         self.engine = Engine(model_dir, 1)
@@ -25,75 +23,31 @@ class SR():
         self.instream.synchronize()
         return self.memories['output'].host
 
-class SRCore():
-    def __init__(self):
-        pass
-    def inference(self):
-        raise ValueError('No provided implementation')
-    def SyncfetchRes(self)->np.ndarray:
-        raise ValueError('No provided implementation')
-    def viewRes(self)->np.ndarray:
-        raise ValueError('No provided implementation')
-
-class SRLinkTha(SRCore):
-    def __init__(self, model_dir, tha_core:THACore):
-        self.instream = tha_core.instream
+class SR():
+    def __init__(self, model_dir, instream = None, in_mem:HostDeviceMem = None):
+        self.instream = instream if instream is not None else cuda.Stream() 
         self.fetchstream = cuda.Stream() 
         self.finishedExec = cuda.Event()
         self.finishedFetch = cuda.Event()
-        self.returned = True
         self.engine = Engine(model_dir, 1)
         self.memories = {}
-        self.memories['input'] = tha_core.memories['output_cv_img']
-        self.memories['output_cv_img'] = createMemory(self.engine.outputs[0])
+        self.memories['input'] = in_mem if in_mem is not None else createMemory(self.engine.inputs[0])
+        self.memories['output'] = createMemory(self.engine.outputs[0])
         self.engine.setInputMems([self.memories['input']])
-        self.engine.setOutputMems([self.memories['output_cv_img']]) 
-
-    def inference(self, return_now:bool) -> np.ndarray:
-        self.fetchstream.synchronize()
-        self.engine.exec(self.instream)
-        self.finishedExec.record(self.instream)
-
-        self.fetchstream.wait_for_event(self.finishedExec)
-        self.memories['output_cv_img'].dtoh(self.fetchstream)
-        self.finishedFetch.record(self.fetchstream)
-        
-    def SyncfetchRes(self)->np.ndarray:
-        self.finishedFetch.synchronize()
-        return self.memories['output_cv_img'].host
-    
-    def viewRes(self)->np.ndarray:
-        return self.memories['output_cv_img'].host
-    
-
-class SRLinkRife(SRCore):
-    def __init__(self, model_dir:str, rife_core:RIFECoreLinked, idx:int):
-        self.instream = rife_core.instream
-        self.scale = rife_core.scale
-        assert(idx < self.scale)
-        self.fetchstream = cuda.Stream() 
-        self.finishedExec = cuda.Event()
-        self.finishedFetch = cuda.Event() 
-        self.returned = True
-        self.engine = Engine(model_dir, 1)
-        self.memories = {}
-        self.memories['input'] = rife_core.memories['framegen_'+str(idx)]
-        self.memories['output_cv_img'] = createMemory(self.outputs[0])
-        self.engine.setInputMems([self.memories['input']])
-        self.engine.setOutputMems([self.memories['output_cv_img']]) 
+        self.engine.setOutputMems([self.memories['output']]) 
 
     def inference(self):
         self.fetchstream.synchronize()
         self.engine.exec(self.instream)
         self.finishedExec.record(self.instream)
-            #Fetch to cpu
+
         self.fetchstream.wait_for_event(self.finishedExec)
-        self.memories['output_cv_img'].dtoh(self.fetchstream)
+        self.memories['output'].dtoh(self.fetchstream)
         self.finishedFetch.record(self.fetchstream)
         
-    def SyncfetchRes(self)->np.ndarray:
+    def SyncfetchRes(self)->List[np.ndarray]:
         self.finishedFetch.synchronize()
-        return self.memories['output_cv_img'].host
+        return [self.memories['output'].host]
     
-    def viewRes(self)->np.ndarray:
-        return self.memories['output_cv_img'].host
+    def viewRes(self)->List[np.ndarray]:
+        return [self.memories['output'].host]

@@ -1,7 +1,7 @@
 from typing import List
 
 import numpy as np
-from ezvtb_rt.rife_ort import RIFEORTCore
+from ezvtb_rt.rife_ort import RIFEORT
 from ezvtb_rt.tha_ort import THAORTCore, THAORTCoreNonDefault
 from ezvtb_rt.cache import Cacher
 from ezvtb_rt.sr_ort import SRORTCore
@@ -13,7 +13,7 @@ class CoreORT:
         else:
             self.tha = THAORTCoreNonDefault(tha_path, device_id, use_eyebrow)
         if rife_path is not None:
-            self.rife = RIFEORTCore(rife_path, device_id)
+            self.rife = RIFEORT(rife_path, device_id)
             self.sr = None
         elif sr_path is not None:
             self.sr = SRORTCore(sr_path, device_id)
