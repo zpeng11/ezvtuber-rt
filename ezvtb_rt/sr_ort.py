@@ -22,7 +22,7 @@ class SRORT:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         provider_options = [{'device_id':device_id}]
 
-        self.sr = ort.InferenceSession(model_dir, sess_options=options, providers=providers, provider_options=provider_options)
+        self.sr = ort.InferenceSession(model_dir + '.onnx', sess_options=options, providers=providers, provider_options=provider_options)
 
         self.input_name = 'x' if 'waifu2x' in model_dir else 'input'
             
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     import os
     
     # Initialize SR with waifu2x model
-    sr = SRORT('data/models/Real-ESRGAN/exported_256_fp16.onnx', 0)
+    sr = SRORT('data/models/Real-ESRGAN/exported_256_fp16', 0)
     
     # Load test image
     img = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)

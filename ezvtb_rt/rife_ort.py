@@ -32,7 +32,7 @@ class RIFEORT:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         provider_options = [{'device_id':device_id}]
 
-        self.rife = ort.InferenceSession(rife_dir, sess_options=options, providers=providers, provider_options=provider_options)
+        self.rife = ort.InferenceSession(rife_dir + '.onnx', sess_options=options, providers=providers, provider_options=provider_options)
         self.previous_frame = None
 
     def inference(self, img:List[np.ndarray]) -> List[np.ndarray]:
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     import os
     
     # Initialize RIFE with x2 model
-    rife = RIFEORT('C:\\EasyVtuber\\data\\models\\rife_512\\x2\\fp16.onnx', 0)
+    rife = RIFEORT('C:\\EasyVtuber\\data\\models\\rife_512\\x2\\fp16', 0)
     
     # Load two test images
     img1 = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
