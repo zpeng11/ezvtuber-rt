@@ -2,7 +2,7 @@ import onnxruntime as ort
 import numpy as np
 from typing import List
 
-class SRORTCore:
+class SRORT:
     def __init__(self, model_dir:str, device_id:int):
         avaliales = ort.get_available_providers()
         if 'CUDAExecutionProvider' in avaliales:
@@ -22,7 +22,7 @@ class SRORTCore:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         provider_options = [{'device_id':device_id}]
 
-        self.sr = ort.InferenceSession(model_dir+".onnx", sess_options=options, providers=providers, provider_options=provider_options)
+        self.sr = ort.InferenceSession(model_dir, sess_options=options, providers=providers, provider_options=provider_options)
 
         self.input_name = 'x' if 'waifu2x' in model_dir else 'input'
             
@@ -32,3 +32,45 @@ class SRORTCore:
         for img in imgs:
             ret.append(self.sr.run(None, {self.input_name: img})[0])
         return ret
+
+if __name__ == '__main__':
+    import cv2
+    import os
+    
+    # Initialize SR with waifu2x model
+    sr = SRORT('data/models/Real-ESRGAN/exported_256_fp16.onnx', 0)
+    
+    # Load test image
+    img = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
+    
+    if img is None:
+        raise FileNotFoundError('Test image not found in data/images directory')
+    
+    # Show original image
+    cv2.imshow('Original', img)
+    cv2.waitKey(500)
+    
+    print(f'Running super-resolution ')
+    result = sr.inference([img])[0]
+    cv2.imshow(f'Super-Resolved ', result)
+    cv2.waitKey(500)
+
+    # Initialize SR with waifu2x model
+    sr = SRORT('data\\models\\waifu2x_upconv\\fp16\\upconv_7\\photo\\noise1_scale2x.onnx', 0)
+    
+    # Load test image
+    img = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
+    
+    if img is None:
+        raise FileNotFoundError('Test image not found in data/images directory')
+    
+    # Show original image
+    cv2.imshow('Original', img)
+    cv2.waitKey(1000)
+    
+    print(f'Running super-resolution ')
+    result = sr.inference([img])[0]
+    cv2.imshow(f'Super-Resolved ', result)
+    cv2.waitKey(1000)
+    
+    cv2.destroyAllWindows()

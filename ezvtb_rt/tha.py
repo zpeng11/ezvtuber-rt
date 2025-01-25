@@ -2,7 +2,9 @@ from ezvtb_rt.trt_utils import *
 from ezvtb_rt.engine import Engine, createMemory
 from collections import OrderedDict
 
-class THASimple(): #Simple implementation of tensorrt tha core, just for benchmarking tha's performance on given platform
+# THASimple - A basic implementation of THA core using TensorRT
+# Used primarily for benchmarking performance on different platforms
+class THASimple():
     def __init__(self, model_dir):
         super().__init__(model_dir)
         # create stream
@@ -45,7 +47,8 @@ class THASimple(): #Simple implementation of tensorrt tha core, just for benchma
         self.finishedFetchRes.synchronize()
         return self.memories['output_cv_img'].host
 
-#memory management protector of VRAM
+# VRAMMem - Manages allocation and deallocation of GPU memory
+# Wraps CUDA memory allocation with automatic cleanup
 class VRAMMem(object):
     def __init__(self, nbytes:int):
         self.device = cuda.mem_alloc(nbytes)
@@ -71,7 +74,7 @@ class VRAMCacher(object):
         self.hits = 0
         self.miss = 0
         if max_size <= 0:
-            self.single_mem = (VRAMMem(nbytes1), VRAMMem(nbytes2))
+            self.single_mem = (VRAMMem(nbytes1), VRAMMem(nbytes2)) #for zero memory cache
         self.max_size = max_size
     def query(self, hs:int)->bool:
         cached = self.cache.get(hs)
@@ -89,7 +92,7 @@ class VRAMCacher(object):
             self.miss += 1
             return None
     def write_mem_set(self, hs:int)->set[VRAMMem, VRAMMem]:
-        if self.max_size <= 0:
+        if self.max_size <= 0: #Do this to handle zero memory cache
             return self.single_mem
         if len(self.pool) != 0:
             mem_set = self.pool.pop()

@@ -53,7 +53,6 @@ class RIFE():
         self.instream = instream if instream is not None else cuda.Stream() 
         self.copystream = cuda.Stream() 
         self.finishedExec = cuda.Event()
-        self.finishedFetch = cuda.Event()
 
     def inference(self):
         self.copystream.synchronize()
@@ -61,15 +60,14 @@ class RIFE():
         self.finishedExec.record(self.instream)
 
         self.copystream.wait_for_event(self.finishedExec)
-        for i in range(self.scale):
-            self.memories['framegen_'+str(i)].dtoh(self.copystream)
-        self.finishedFetch.record(self.copystream)
         cuda.memcpy_dtod_async(self.memories['old_frame'].device, self.memories['latest_frame'].device, 
                                    self.memories['latest_frame'].host.nbytes, self.copystream)
 
     def SyncfetchRes(self)->List[np.ndarray]:
+        for i in range(self.scale):
+            self.memories['framegen_'+str(i)].dtoh(self.copystream)
         ret = []
-        self.finishedFetch.synchronize()
+        self.copystream.synchronize()
         for i in range(self.scale):
             ret.append(self.memories['framegen_'+str(i)].host)
         return ret

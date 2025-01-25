@@ -22,32 +22,38 @@ class SRSimple():
         self.memories['output'].dtoh(self.instream)
         self.instream.synchronize()
         return self.memories['output'].host
-
+    
 class SR():
-    def __init__(self, model_dir, instream = None, in_mem:HostDeviceMem = None):
-        self.instream = instream if instream is not None else cuda.Stream() 
+    def __init__(self, model_dir:str, instream = None, in_mems:List[HostDeviceMem] = None):
+        self.instream = instream
+        self.scale = 1 if in_mems is None else len(in_mems)
         self.fetchstream = cuda.Stream() 
-        self.finishedExec = cuda.Event()
-        self.finishedFetch = cuda.Event()
-        self.engine = Engine(model_dir, 1)
+        self.finishedExec = [cuda.Event() for _ in range(self.scale)]
+        self.engines = []
         self.memories = {}
-        self.memories['input'] = in_mem if in_mem is not None else createMemory(self.engine.inputs[0])
-        self.memories['output'] = createMemory(self.engine.outputs[0])
-        self.engine.setInputMems([self.memories['input']])
-        self.engine.setOutputMems([self.memories['output']]) 
+        for i in range(self.scale):
+            engine = Engine(model_dir, 1)
+            self.memories['framegen_'+str(i)] = in_mems[i] if in_mems is not None else createMemory(engine.inputs[0])
+            self.memories['output_'+str(i)] = createMemory(engine.outputs[0])
+            engine.setInputMems([self.memories['framegen_'+str(i)]])
+            engine.setOutputMems([self.memories['output_'+str(i)]]) 
+            self.engines.append(engine)
 
     def inference(self):
-        self.fetchstream.synchronize()
-        self.engine.exec(self.instream)
-        self.finishedExec.record(self.instream)
-
-        self.fetchstream.wait_for_event(self.finishedExec)
-        self.memories['output'].dtoh(self.fetchstream)
-        self.finishedFetch.record(self.fetchstream)
+        for i in range(len(self.engines)):
+            #execution
+            self.engines[i].exec(self.instream)
+            self.finishedExec[i].record(self.instream)
+            #Fetch to cpu
+            self.fetchstream.wait_for_event(self.finishedExec[i])
+            self.memories['output_'+str(i)].dtoh(self.fetchstream)
         
     def SyncfetchRes(self)->List[np.ndarray]:
-        self.finishedFetch.synchronize()
-        return [self.memories['output'].host]
+        for i in range(len(self.engines)):
+            self.fetchstream.wait_for_event(self.finishedExec[i])
+            self.memories['output_'+str(i)].dtoh(self.fetchstream)
+        self.fetchstream.synchronize()
+        return [self.memories['output_'+str(i)].host for i in range(self.scale)]
     
     def viewRes(self)->List[np.ndarray]:
-        return [self.memories['output'].host]
+        return [self.memories['output_'+str(i)].host for i in range(self.scale)]

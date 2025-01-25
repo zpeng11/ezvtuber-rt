@@ -248,3 +248,52 @@ class THAORTNonDefault:
                 'rotator_rotation_pose':poses[:,12+27:],
                 'editor_rotation_pose':poses[:,12+27:],
             })
+        
+if __name__ == '__main__':
+    import cv2
+    
+    def generate_random_pose():
+        """Generate random pose inputs for testing"""
+        return np.random.random((45,)).astype(np.float32)
+    
+    # Load test image
+    img_path = os.path.join('data', 'images', 'lambda_00.png')
+    if not os.path.exists(img_path):
+        raise FileNotFoundError(f'Test image not found at {img_path}')
+    
+    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise ValueError('Failed to load test image')
+
+    # Initialize THAORT
+    print("Initializing THAORT...")
+    tha = THAORTNonDefault('data\\models\\tha3\\seperable\\fp16', 0, use_eyebrow=True)
+    
+    # Update with test image
+    print("Updating image...")
+    tha.update_image(img)
+    
+    # Show original image
+    cv2.imshow('Original Image', img)
+    cv2.waitKey(500)
+    
+    # Test with random poses
+    for i in range(10):  # Test 5 random poses
+        print(f"\nTesting pose {i+1}")
+        pose = generate_random_pose()
+        
+        try:
+            # Get results
+            print("Running inference...")
+            result = tha.inference(pose[np.newaxis, :])[0]
+            
+            # Display results
+            cv2.imshow(f'Result Pose {i+1}', result)
+            cv2.waitKey(500)
+            
+        except Exception as e:
+            print(f"Error during pose testing: {str(e)}")
+            continue
+
+    cv2.waitKey(1000)
+    cv2.destroyAllWindows()

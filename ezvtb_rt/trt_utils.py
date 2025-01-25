@@ -209,3 +209,12 @@ class Processor:
         self.stream.synchronize()
         
         return [np.copy(outp.host) for outp in self.outputs]
+
+if __name__ == "__main__":
+    # Build THA engines
+    print("Building THA TensorRT engines...")
+    success = check_build_all_models("data/models")
+    if success:
+        print("Successfully built all THA engines")
+    else:
+        print("Failed to build some THA engines")

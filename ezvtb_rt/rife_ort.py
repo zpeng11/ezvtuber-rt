@@ -32,7 +32,7 @@ class RIFEORT:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         provider_options = [{'device_id':device_id}]
 
-        self.rife = ort.InferenceSession(rife_dir+".onnx", sess_options=options, providers=providers, provider_options=provider_options)
+        self.rife = ort.InferenceSession(rife_dir, sess_options=options, providers=providers, provider_options=provider_options)
         self.previous_frame = None
 
     def inference(self, img:List[np.ndarray]) -> List[np.ndarray]:
@@ -42,7 +42,37 @@ class RIFEORT:
             'tha_img_0': self.previous_frame,
             'tha_img_1': img[0]
         })
-        self.previous_frame = np.array(img[0])
+        self.previous_frame = ret[-1]
         return ret
 
-        
+if __name__ == '__main__':
+    import cv2
+    import os
+    
+    # Initialize RIFE with x2 model
+    rife = RIFEORT('C:\\EasyVtuber\\data\\models\\rife_512\\x2\\fp16.onnx', 0)
+    
+    # Load two test images
+    img1 = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
+    img2 = cv2.imread('./data/images/lambda_01.png', cv2.IMREAD_UNCHANGED)
+    imgs = [img1, img2]
+    
+    if img1 is None or img2 is None:
+        raise FileNotFoundError('Test images not found in data/images directory')
+    
+    # Show original frames
+    cv2.imshow('Frame 1', img1)
+    cv2.waitKey(500)
+    cv2.imshow('Frame 2', img2)
+    cv2.waitKey(500)
+    
+    # Run multiple interpolation iterations
+    for i in range(10):  # Number of interpolation iterations
+        print(f'Running interpolation iteration {i+1}')
+        result = rife.inference([imgs[i%2]])
+        cv2.imshow(f'Interpolated Frame {i+1}', result[0])
+        cv2.waitKey(500)
+        cv2.imshow(f'Interpolated Frame {i+1}', result[1])
+        cv2.waitKey(500)
+    
+    cv2.destroyAllWindows()
