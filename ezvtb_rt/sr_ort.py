@@ -2,7 +2,7 @@ import onnxruntime as ort
 import numpy as np
 from typing import List
 
-class SRORTCore:
+class SRORT:
     def __init__(self, model_dir:str, device_id:int):
         avaliales = ort.get_available_providers()
         if 'CUDAExecutionProvider' in avaliales:
@@ -22,7 +22,7 @@ class SRORTCore:
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         provider_options = [{'device_id':device_id}]
 
-        self.sr = ort.InferenceSession(model_dir+".onnx", sess_options=options, providers=providers, provider_options=provider_options)
+        self.sr = ort.InferenceSession(model_dir + '.onnx', sess_options=options, providers=providers, provider_options=provider_options)
 
         self.input_name = 'x' if 'waifu2x' in model_dir else 'input'
             

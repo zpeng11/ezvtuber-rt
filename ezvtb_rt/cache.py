@@ -8,8 +8,8 @@ from typing import List,Dict
 import threading
 
 
-def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_size:int, cache_quality:int):
-    max_kbytes = max_size * 1024 * 1024
+def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_volume:int, cache_quality:int):
+    max_kbytes = max_volume * 1024 * 1024
     cached_kbytes = 0
     while True:
         hs, data = queue.get(block=True)
@@ -39,17 +39,16 @@ def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_
 
 
 class Cacher:
-    def __init__(self, max_size:float = 2.0, cache_quality:int = 90,  image_size:int = 512): #Size in GBs
+    def __init__(self, max_volume:float = 2.0, cache_quality:int = 90): #Size in GBs
         self.cache = OrderedDict()
         self.lock = threading.Lock()
         self.queue = Queue()
 
         self.hits = 0
         self.miss = 0
-        self.image_size = image_size
         self.cache_quality = cache_quality
 
-        self.thread = threading.Thread(target=threadCompressSave, args=(self.cache, self.lock, self.queue, max_size, cache_quality), daemon=True)
+        self.thread = threading.Thread(target=threadCompressSave, args=(self.cache, self.lock, self.queue, max_volume, cache_quality), daemon=True)
         self.thread.start()
         self.temp_data = None
         self.continues_hits = 0
@@ -82,3 +81,17 @@ class Cacher:
             return None
     def write(self, hs:int, data:np.ndarray):
         self.queue.put_nowait((hs, data.copy()))
+
+
+if __name__ == '__main__':
+    import cv2
+    # Load test image
+    img = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
+    cacher = Cacher()
+    cacher.write(0, img)
+    import time
+    time.sleep(0.5)
+    print(cacher.read(0) is None)
+    from tqdm import tqdm
+    for i in tqdm(range(10000)):
+        a = cacher.read(0)

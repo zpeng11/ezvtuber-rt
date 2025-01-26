@@ -1,27 +1,28 @@
-from typing import List
-
+from typing import List, Optional
 import numpy as np
-from ezvtb_rt.rife_ort import RIFEORTCore
-from ezvtb_rt.tha_ort import THAORTCore, THAORTCoreNonDefault
+from ezvtb_rt.rife_ort import RIFEORT
+from ezvtb_rt.tha_ort import THAORT, THAORTNonDefault
 from ezvtb_rt.cache import Cacher
-from ezvtb_rt.sr_ort import SRORTCore
+from ezvtb_rt.sr_ort import SRORT
+from ezvtb_rt.common import Core
     
-class CoreORT:
-    def __init__(self, tha_path:str, rife_path:str = None, sr_path:str = None, device_id:int = 0, cacher:Cacher = None, use_eyebrow:bool = True):
+class CoreORT(Core):
+    def __init__(self, tha_path:Optional[str] = None, rife_path:Optional[str] = None, sr_path:Optional[str] = None, device_id:int = 0, cache_max_volume:float = 2.0, cache_quality:int = 90, use_eyebrow:bool = True):
         if device_id == 0:
-            self.tha = THAORTCore(tha_path, use_eyebrow)
+            self.tha = THAORT(tha_path, use_eyebrow)
         else:
-            self.tha = THAORTCoreNonDefault(tha_path, device_id, use_eyebrow)
+            self.tha = THAORTNonDefault(tha_path, device_id, use_eyebrow)
+
+        self.rife = None
+        self.sr = None
+        self.cacher = None
+
         if rife_path is not None:
-            self.rife = RIFEORTCore(rife_path, device_id)
-            self.sr = None
-        elif sr_path is not None:
-            self.sr = SRORTCore(sr_path, device_id)
-            self.rife = None
-        else:
-            self.rife = None
-            self.sr = None
-        self.cacher = cacher
+            self.rife = RIFEORT(rife_path, device_id)
+        if sr_path is not None:
+            self.sr = SRORT(sr_path, device_id)
+        if cache_max_volume > 0.0:
+            self.cacher = Cacher(cache_max_volume, cache_quality)
     def setImage(self, img:np.ndarray):
         self.tha.update_image(img)
     def inference(self, pose:np.ndarray) -> List[np.ndarray]:
@@ -29,30 +30,20 @@ class CoreORT:
 
         if self.cacher is None:# Do not use cacher
             res = self.tha.inference(pose)
-            if self.rife is not None:
-                res = self.rife.inference(res)
-            if self.sr is not None:
-                res = self.sr.inference(res)
-            return res
-        
-        #use cacher 
-        hs = hash(str(pose))
-        cached = self.cacher.read(hs)
+        else:
+            #use cacher 
+            hs = hash(str(pose))
+            cached = self.cacher.read(hs)
 
-        if cached is not None:# Cache hits
-            if self.rife is not None: # There is rife
-                return self.rife.inference([cached])
-            elif self.sr is not None:
-                return self.sr.inference([cached])
-            else:
-                return [cached]
+            if cached is not None:# Cache hits
+                res = [cached]
+            else: #cache missed
+                res = self.tha.inference(pose)
+                self.cacher.write(hs, res[0])
 
-        else: #cache missed
-            res = self.tha.inference(pose)
-            self.cacher.write(hs, res[0])
-            if self.rife is not None:
-                res = self.rife.inference(res)
-            elif self.sr is not None:
-                res = self.sr.inference(res)
-            return res
+        if self.rife is not None:
+            res = self.rife.inference(res)
+        if self.sr is not None:
+            res = self.sr.inference(res)
+        return res
 
