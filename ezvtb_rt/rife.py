@@ -1,128 +1,119 @@
-import os
 from ezvtb_rt.trt_utils import *
 from ezvtb_rt.engine import Engine, createMemory
-from ezvtb_rt.tha import THACore
 
-class RIFECore:
-    def __init__(self, model_dir:str, latest_frame:HostDeviceMem = None):
-        if 'x2' in model_dir:
-            self.scale = 2
-        elif 'x3' in model_dir:
-            self.scale = 3
-        elif 'x4' in model_dir:
-            self.scale = 4
-        else:
-            raise ValueError('can not determine scale')
-        TRT_LOGGER.log(TRT_LOGGER.INFO, f'RIFE scale {self.scale}')
-        TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating RIFE engine')
-        self.prepareEngines(model_dir)
-        self.prepareMemories(latest_frame)
-        self.setMemsToEngines()
-
-    def prepareEngines(self, model_dir:str): #inherit and pass different engine type
-        head_tail = os.path.split(model_dir)
-        self.engine = Engine(head_tail[0], head_tail[1], 2)
-    def prepareMemories(self, latest_frame:HostDeviceMem): 
-        self.memories = {}
-        self.memories['old_frame'] = createMemory(self.engine.inputs[0])
-        if latest_frame is None:
-            self.memories['latest_frame'] = createMemory(self.engine.inputs[1])
-        else:
-            self.memories['latest_frame'] = latest_frame
-        for i in range(self.scale):
-            self.memories['framegen_'+str(i)] = createMemory(self.engine.outputs[i])
-    def setMemsToEngines(self):
-        self.engine.setInputMems([self.memories['old_frame'], self.memories['latest_frame']])
-        outputs = [self.memories['framegen_'+str(i)] for i in range(self.scale)]
-        self.engine.setOutputMems(outputs)
-    def inference(self, return_now:bool) -> List[np.ndarray]:
-        raise ValueError('No provided implementation')
-    def fetchRes(self)->List[np.ndarray]:
-        raise ValueError('No provided implementation')
-    def viewRes(self)->List[np.ndarray]:
-        raise ValueError('No provided implementation')
-
-
-class RIFECoreSimple(RIFECore): #Simple implementation of tensorrt rife core, just for benchmarking rife's performance on given platform
+class RIFESimple():
+    """Simplified RIFE implementation for performance benchmarking.
+    
+    Provides basic frame interpolation using TensorRT engine with single CUDA stream.
+    Optimized for measuring inference speed rather than production use."""
     def __init__(self, model_dir):
         super().__init__(model_dir)
-        # create stream
-        self.instream = cuda.Stream()
-        self.outstream = cuda.Stream()
-        # Create CUDA events
-        self.finishedFetchRes = cuda.Event()
-        self.finishedExec = cuda.Event()
+        # Create CUDA stream for asynchronous operations
+        self.instream = cuda.Stream()  # Primary stream for data transfers and execution
 
-
-    def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]: # Give new input and return last result at the same time
-
-        self.outstream.wait_for_event(self.finishedExec)
+    def run(self, old_frame:np.ndarray, latest_frame:np.ndarray) -> List[np.ndarray]:
+        """Process frames through TensorRT engine.
         
-        for i in range(self.scale):
-            self.memories['framegen_'+str(i)].dtoh(self.outstream)
-        
-        self.finishedFetchRes.record(self.outstream)
-
-        np.copyto(self.memories['old_frame'].host, old_frame)
-        self.memories['old_frame'].htod(self.instream)
+        Args:
+            old_frame: Previous frame in NHWC format (batch, height, width, channels)
+            latest_frame: Current frame in same format
+            
+        Returns:
+            List of interpolated frames at different scales"""
+        # Host-to-device memory transfers
+        np.copyto(self.memories['old_frame'].host, old_frame)  # Copy CPU data to pinned host memory
+        self.memories['old_frame'].htod(self.instream)  # Async H->D copy
         np.copyto(self.memories['latest_frame'].host, latest_frame)
         self.memories['latest_frame'].htod(self.instream)
 
-        self.instream.wait_for_event(self.finishedFetchRes)
+        self.engine.exec(self.instream)  # Execute inference on current stream
 
-        self.engine.exec(self.instream)
-    
-        self.finishedExec.record(self.instream)
-
-        self.finishedFetchRes.synchronize()
-
-        ret = []
+        # Device-to-host transfers for each scale output
         for i in range(self.scale):
-            ret.append(self.memories['framegen_'+str(i)].host)
+            self.memories['framegen_'+str(i)].dtoh(self.instream)  # Async D->H copy
+
+        self.instream.synchronize()  # Wait for all async operations
+        ret = []
+        for i in range(self.scale):  # Collect results for each scale
+            ret.append(self.memories['framegen_'+str(i)].host)  # Access host memory
         return ret
     
-class RIFECoreLinked(RIFECore):
-    def __init__(self, model_dir, tha_core:THACore):
-        super().__init__(model_dir, tha_core.memories['output_cv_img'])
-        self.instream = tha_core.instream
-        self.copystream = cuda.Stream() 
-        self.finishedExec = cuda.Event()
-        self.finishedFetch = cuda.Event()
-        self.returned = True
-
-    def inference(self, return_now:bool) -> List[np.ndarray]:
-        self.copystream.synchronize()
-        self.engine.exec(self.instream)
-        self.finishedExec.record(self.instream)
-
-        self.copystream.wait_for_event(self.finishedExec)
-        for i in range(self.scale):
-            self.memories['framegen_'+str(i)].dtoh(self.copystream)
-        self.finishedFetch.record(self.copystream)
-        cuda.memcpy_dtod_async(self.memories['old_frame'].device, self.memories['latest_frame'].device, 
-                                   self.memories['latest_frame'].host.nbytes, self.copystream)
-        self.returned = False
-
-        if return_now:
-            self.returned = True
-            ret = []
-            self.finishedFetch.synchronize()
-            for i in range(self.scale):
-                ret.append(self.memories['framegen_'+str(i)].host)
-            return ret
+class RIFE():
+    """Production RIFE implementation with pipelined execution.
+    
+    Uses dual CUDA streams to overlap compute and memory transfers.
+    Supports multi-scale frame generation through model directory parsing."""
+    def __init__(self, model_dir, instream=None, in_mem:HostDeviceMem=None):
+        # Determine interpolation scale from model filename
+        if 'x2' in model_dir:
+            self.scale = 2  # 2x temporal interpolation
+        elif 'x3' in model_dir:
+            self.scale = 3  # 3x interpolation
+        elif 'x4' in model_dir:
+            self.scale = 4  # 4x interpolation
         else:
-            return None
-    def fetchRes(self)->List[np.ndarray]:
-        if self.returned == True:
-            raise ValueError('Already fetched result')
-        self.returned = True
-        ret = []
-        self.finishedFetch.synchronize()
+            raise ValueError('Model directory must contain x2/x3/x4 to indicate scale')
+        TRT_LOGGER.log(TRT_LOGGER.INFO, f'Creating RIFE with scale {self.scale}')  # TensorRT initialization log
+
+        self.engine = Engine(model_dir + '.trt', 2)  # Load TensorRT engine with 2MB workspace
+
+        # Initialize memory buffers
+        self.memories = {}
+        # Input buffers
+        self.memories['old_frame'] = createMemory(self.engine.inputs[0])  # Previous frame
+        self.memories['latest_frame'] = in_mem if in_mem is not None else createMemory(self.engine.inputs[1])  # Reusable input memory
+        # Output buffers for each scale
         for i in range(self.scale):
-            ret.append(self.memories['framegen_'+str(i)].host)
+            self.memories['framegen_'+str(i)] = createMemory(self.engine.outputs[i])  # Allocate per-scale output
+        
+        # Bind memory to engine I/O
+        self.engine.setInputMems([self.memories['old_frame'], self.memories['latest_frame']])  # Set input bindings
+        outputs = [self.memories['framegen_'+str(i)] for i in range(self.scale)]
+        self.engine.setOutputMems(outputs)
+
+        # Create CUDA streams and events
+        self.instream = instream if instream is not None else cuda.Stream()  # Inference stream
+        self.copystream = cuda.Stream()  # Dedicated stream for memory copies
+        self.finishedExec = cuda.Event()  # Synchronization event
+
+    def inference(self):
+        """Execute pipeline: 
+        1. Wait for previous copies
+        2. Run inference
+        3. Signal completion
+        4. Schedule frame buffer copy"""
+        self.copystream.synchronize()  # Ensure previous copies complete
+        self.engine.exec(self.instream)  # Run TensorRT engine
+        self.finishedExec.record(self.instream)  # Mark inference completion
+
+        # Schedule device-to-device copy after inference completes
+        self.copystream.wait_for_event(self.finishedExec)  # Wait for inference finish
+        cuda.memcpy_dtod_async(
+            self.memories['old_frame'].device,  # dst: previous frame buffer
+            self.memories['latest_frame'].device,  # src: current frame buffer
+            self.memories['latest_frame'].host.nbytes,  # buffer size
+            self.copystream  # Use copy stream to overlap with next inference
+        )
+
+    def fetchRes(self) -> List[np.ndarray]:
+        """Retrieve and synchronize all results.
+        
+        Returns:
+            List of processed frames in host memory"""
+        for i in range(self.scale):
+            self.memories['framegen_'+str(i)].dtoh(self.copystream)  # Schedule D->H copies
+        ret = []
+        self.copystream.synchronize()  # Wait for all copies
+        for i in range(self.scale):
+            ret.append(self.memories['framegen_'+str(i)].host)  # Access synchronized data
         return ret
-    def viewRes(self)->List[np.ndarray]:
+
+    def viewRes(self) -> List[np.ndarray]:
+        """Get current device memory state without synchronization.
+        
+        Returns:
+            List of frames from device memory (may contain stale data)"""
         ret = []
         for i in range(self.scale):
-            ret.append(self.memories['framegen_'+str(i)].host)
+            ret.append(self.memories['framegen_'+str(i)].host)  # Non-blocking access
         return ret

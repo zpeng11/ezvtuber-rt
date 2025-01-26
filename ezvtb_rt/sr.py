@@ -1,128 +1,121 @@
-import os
 from ezvtb_rt.trt_utils import *
-from ezvtb_rt.engine import Engine, createMemory
+from ezvtb_rt.engine import Engine, createMemory, HostDeviceMem
 import numpy as np
-from ezvtb_rt.tha import THACore
-from ezvtb_rt.rife import RIFECoreLinked
 
-class SR():
+
+class SRSimple():
+    """Single-stream super-resolution processor using TensorRT engine."""
+    
     def __init__(self, model_dir):
+        """Initialize CUDA stream, TensorRT engine and memory buffers.
+        
+        Args:
+            model_dir: Path to TensorRT engine file (without .trt extension)
+        """
+        # Create dedicated CUDA stream and load TensorRT engine
         self.instream = cuda.Stream()
-        head_tail = os.path.split(model_dir)
-        self.engine = Engine(head_tail[0], head_tail[1], 1)
+        self.engine = Engine(model_dir + '.trt', 1)
+        
+        # Allocate input/output memory buffers
         self.memories = {}
         self.memories['input'] = createMemory(self.engine.inputs[0])
         self.memories['output'] = createMemory(self.engine.outputs[0])
+        
+        # Configure engine memory bindings
         self.engine.setInputMems([self.memories['input']])
         self.engine.setOutputMems([self.memories['output']])
         
-        self.returned = True
+        self.returned = True  # Track processing state
 
     def run(self, img:np.ndarray) -> np.ndarray:
-        np.copyto(self.memories['input'].host, img)
-        self.memories['input'].htod(self.instream)
-        self.engine.exec(self.instream)
-        self.memories['output'].dtoh(self.instream)
-        self.instream.synchronize()
-        return self.memories['output'].host
-
-class SRCore():
-    def __init__(self):
-        pass
-    def inference(self, return_now:bool) -> List[np.ndarray]:
-        raise ValueError('No provided implementation')
-    def fetchRes(self)->List[np.ndarray]:
-        raise ValueError('No provided implementation')
-    def viewRes(self)->List[np.ndarray]:
-        raise ValueError('No provided implementation')
-
-class SRLinkTha(SRCore):
-    def __init__(self, model_dir, tha_core:THACore):
-        self.instream = tha_core.instream
-        self.fetchstream = cuda.Stream() 
-        self.finishedExec = cuda.Event()
-        self.finishedFetch = cuda.Event()
-        self.returned = True
-        head_tail = os.path.split(model_dir)
-        self.engine = Engine(head_tail[0], head_tail[1], 1)
-        self.memories = {}
-        self.memories['input'] = tha_core.memories['output_cv_img']
-        self.memories['output_cv_img'] = createMemory(self.engine.outputs[0])
-        self.engine.setInputMems([self.memories['input']])
-        self.engine.setOutputMems([self.memories['output_cv_img']]) 
-
-    def inference(self, return_now:bool) -> List[np.ndarray]:
-        self.fetchstream.synchronize()
-        self.engine.exec(self.instream)
-        self.finishedExec.record(self.instream)
-
-        self.fetchstream.wait_for_event(self.finishedExec)
-        self.memories['output_cv_img'].dtoh(self.fetchstream)
-        self.finishedFetch.record(self.fetchstream)
-        self.returned = False
-
-        if return_now:
-            self.returned = True
-            self.finishedFetch.synchronize()
-            return [self.memories['output_cv_img'].host]
-        else:
-            return None
+        """Execute super-resolution processing pipeline.
         
-    def fetchRes(self)->List[np.ndarray]:
-        if self.returned == True:
-            raise ValueError('Already fetched result')
-        self.returned = True
-        self.finishedFetch.synchronize()
-        return [self.memories['output_cv_img'].host]
+        Args:
+            img: Input low-resolution image as numpy array
+            
+        Returns:
+            High-resolution output image as numpy array
+        """
+        # Copy input data to host buffer
+        np.copyto(self.memories['input'].host, img)
+        
+        # Transfer input to device memory
+        self.memories['input'].htod(self.instream)
+        
+        # Execute TensorRT inference
+        self.engine.exec(self.instream)
+        
+        # Transfer output back to host memory
+        self.memories['output'].dtoh(self.instream)
+        
+        # Wait for all operations to complete
+        self.instream.synchronize()
+        
+        return self.memories['output'].host
     
-    def viewRes(self)->List[np.ndarray]:
-        return [self.memories['output_cv_img'].host]
+class SR():
+    """Multi-stream parallel super-resolution processor."""
     
-
-class SRLinkRife(SRCore):
-    def __init__(self, model_dir:str, rife_core:RIFECoreLinked):
-        self.instream = rife_core.instream
-        self.scale = rife_core.scale
-        self.fetchstream = cuda.Stream() 
-        self.finishedExec = [cuda.Event() for _ in range(self.scale)]
-        self.finishedFetch = cuda.Event() 
-        self.returned = True
-        self.engines = []
-        self.memories = {}
-        head_tail = os.path.split(model_dir)
+    def __init__(self, model_dir:str, instream = None, in_mems:List[HostDeviceMem] = None):
+        """Initialize parallel processing infrastructure.
+        
+        Args:
+            model_dir: Path to TensorRT engine file (without .trt extension)
+            instream: Optional shared CUDA stream for execution
+            in_mems: Optional pre-allocated input memory buffers
+        """
+        self.instream = instream  # Shared CUDA stream
+        self.scale = 1 if in_mems is None else len(in_mems)  # Number of parallel streams
+        self.fetchstream = cuda.Stream()  # Dedicated stream for data transfers
+        self.finishedExec = [cuda.Event() for _ in range(self.scale)]  # Sync events
+        self.engines = []  # TensorRT engine instances
+        self.memories = {}  # Memory buffers
+        
+        # Initialize each processing stream
         for i in range(self.scale):
-            engine = Engine(head_tail[0], head_tail[1], 1)
-            self.memories['framegen_'+str(i)] = rife_core.memories['framegen_'+str(i)]
-            self.memories['output_'+str(i)] = createMemory(engine.outputs[0])
-            engine.setInputMems([self.memories['framegen_'+str(i)]])
-            engine.setOutputMems([self.memories['output_'+str(i)]]) 
+            # Load TensorRT engine
+            engine = Engine(model_dir + '.trt', 1)
+            
+            # Configure memory buffers (reuse existing or create new)
+            self.memories[f'framegen_{i}'] = in_mems[i] if in_mems else createMemory(engine.inputs[0])
+            self.memories[f'output_{i}'] = createMemory(engine.outputs[0])
+            
+            # Bind engine memory
+            engine.setInputMems([self.memories[f'framegen_{i}']])
+            engine.setOutputMems([self.memories[f'output_{i}']])
+            
             self.engines.append(engine)
 
-    def inference(self, return_now:bool) -> List[np.ndarray]:
-        self.fetchstream.synchronize()
+    def inference(self):
+        """Execute parallel inference across all engines."""
         for i in range(len(self.engines)):
-            #execution
+            # Execute engine and record completion event
             self.engines[i].exec(self.instream)
             self.finishedExec[i].record(self.instream)
-            #Fetch to cpu
-            self.fetchstream.wait_for_event(self.finishedExec[i])
-            self.memories['output_'+str(i)].dtoh(self.fetchstream)
-        self.finishedFetch.record(self.fetchstream)
-        self.returned = False
-
-        if return_now:
-            self.returned = True
-            self.finishedFetch.synchronize()
-            return [self.memories['output_'+str(i)].host for i in range(self.scale)]
-        else:
-            return None
         
     def fetchRes(self)->List[np.ndarray]:
-        if self.returned == True:
-            raise ValueError('Already fetched result')
-        self.returned = True
-        self.finishedFetch.synchronize()
-        return [self.memories['output_'+str(i)].host for i in range(self.scale)]
+        """Retrieve processed results from all streams.
+        
+        Returns:
+            List of super-resolved output images
+        """
+        for i in range(len(self.engines)):
+            # Wait for engine completion before transferring
+            self.fetchstream.wait_for_event(self.finishedExec[i])
+            # Copy output from device to host memory
+            self.memories[f'output_{i}'].dtoh(self.fetchstream)
+            
+        # Ensure all transfers complete
+        self.fetchstream.synchronize()
+        
+        return [self.memories[f'output_{i}'].host for i in range(self.scale)]
     
     def viewRes(self)->List[np.ndarray]:
-        return [self.memories['output_'+str(i)].host for i in range(self.scale)]
+        """Get current output buffers without synchronization.
+        
+        Note: May return stale data if inference not complete
+        
+        Returns:
+            List of output buffers in current state
+        """
+        return [self.memories[f'output_{i}'].host for i in range(self.scale)]

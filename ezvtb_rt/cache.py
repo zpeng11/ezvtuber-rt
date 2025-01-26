@@ -7,91 +7,174 @@ import turbojpeg
 from typing import List,Dict
 import threading
 
+"""
+Thread-safe cache system with JPEG compression and LRU eviction.
+Handles high-throughput image data with background compression/eviction.
+Uses TurboJPEG for efficient GPU-accelerated compression/decompression.
+"""
 
 def threadCompressSave(cache:OrderedDict, lock:threading.Lock, queue:Queue, max_volume:int, cache_quality:int):
-    max_kbytes = max_volume * 1024 * 1024
-    cached_kbytes = 0
+    """Background worker thread for cache compression and management.
+    
+    Args:
+        cache: OrderedDict storing compressed entries (LRU)
+        lock: Thread lock for cache access
+        queue: Input queue of (hash, raw_data) tuples to process  
+        max_volume: Maximum cache size in gigabytes
+        cache_quality: JPEG quality (1-100) for compression
+    """
+    max_kbytes = max_volume * 1024 * 1024  # Convert GB to KB
+    cached_kbytes = 0  # Tracks total cached data size
+    
     while True:
+        # Get next item from processing queue
         hs, data = queue.get(block=True)
+        
+        # Check if already cached
         lock.acquire(blocking=True)
         cached = cache.get(hs)
         lock.release()
         if cached is not None:
-            continue
+            continue  # Skip if already exists
+            
+        # Pack RGBA data into 1024x512 buffer:
+        # - Top 512 rows: RGB channels 
+        # - Bottom 512 rows: Alpha channel in R
         new_data = np.zeros((1024, 512, 4), data.dtype)
-        new_data[:512, :, :] = data
-        new_data[512:, :, 0] = data[:,:,3]
+        new_data[:512, :, :] = data  # Store RGB
+        new_data[512:, :, 0] = data[:,:,3]  # Store alpha
 
+        # Compress with TurboJPEG - different settings for lossless vs lossy
         if cache_quality == 100:
-            compressed = turbojpeg.compress(new_data, cache_quality, turbojpeg.SAMP.Y420, lossless = True, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
+            # Lossless compression settings
+            compressed = turbojpeg.compress(
+                new_data, cache_quality, 
+                turbojpeg.SAMP.Y420, 
+                lossless=True, 
+                fastdct=False,  # Higher quality DCT
+                optimize=True,  # Optimize Huffman tables
+                pixelformat=turbojpeg.BGRA
+            )
         else:
-            compressed = turbojpeg.compress(new_data, cache_quality, turbojpeg.SAMP.Y444, fastdct = False, optimize= True, pixelformat=turbojpeg.BGRA)
+            # Lossy compression settings
+            compressed = turbojpeg.compress(
+                new_data, cache_quality,
+                turbojpeg.SAMP.Y444,  # Full chroma sampling
+                fastdct=False,
+                optimize=True,
+                pixelformat=turbojpeg.BGRA  
+            )
+        # Add to cache and update size tracking
         lock.acquire(blocking=True)
         cache[hs] = compressed
         lock.release()
-        cached_kbytes += len(compressed) /1024
+        cached_kbytes += len(compressed) / 1024  # Track size in KB
+        
+        # LRU eviction when over capacity
         while cached_kbytes > max_kbytes:
             lock.acquire(blocking=True)
-            poped = cache.popitem(last=False)
+            poped = cache.popitem(last=False)  # Remove oldest entry
             lock.release()
-            cached_kbytes -= len(poped[1])/1024
-            poped = None
+            cached_kbytes -= len(poped[1]) / 1024
+            poped = None  # Allow GC
 
 
 class Cacher:
-    def __init__(self, max_volume:float = 2.0, cache_quality:int = 90): #Size in GBs
-        self.cache = OrderedDict()
-        self.lock = threading.Lock()
-        self.queue = Queue()
+    """Main cache interface with background compression thread.
+    
+    Attributes:
+        cache: OrderedDict storing compressed entries
+        lock: Thread synchronization lock
+        queue: Compression task queue
+        hits: Total cache hits
+        miss: Total cache misses
+        cache_quality: JPEG compression quality (1-100)
+        continues_hits: Counter for sequential hits (anti-thrashing)
+        last_hs: Last accessed hash key
+    """
+    
+    def __init__(self, max_volume:float = 2.0, cache_quality:int = 90):
+        """Initialize cache with specified size and quality.
+        
+        Args:
+            max_volume: Maximum cache size in gigabytes (default 2.0)
+            cache_quality: JPEG compression quality (default 90)
+        """
+        self.cache = OrderedDict()  # LRU cache storage
+        self.lock = threading.Lock()  # Cache access synchronization
+        self.queue = Queue()  # Background processing queue
 
-        self.hits = 0
-        self.miss = 0
-        self.cache_quality = cache_quality
+        # Performance tracking
+        self.hits = 0  # Total successful cache retrievals
+        self.miss = 0  # Total cache misses
+        self.cache_quality = cache_quality  # Compression quality setting
 
-        self.thread = threading.Thread(target=threadCompressSave, args=(self.cache, self.lock, self.queue, max_volume, cache_quality), daemon=True)
+        # Start background compression thread
+        self.thread = threading.Thread(
+            target=threadCompressSave,
+            args=(self.cache, self.lock, self.queue, max_volume, cache_quality),
+            daemon=True
+        )
         self.thread.start()
-        self.temp_data = None
-        self.continues_hits = 0
-        self.last_hs = -1
+        
+        # Cache state tracking
+        self.temp_data = None  # Temporary buffer (unused in current code)
+        self.continues_hits = 0  # Sequential hit counter
+        self.last_hs = -1  # Last accessed hash key
     def read(self, hs:int) -> np.ndarray:
+        """Retrieve cached data by hash key.
+        
+        Args:
+            hs: Hash key of requested data
+            
+        Returns:
+            np.ndarray: Decompressed image data or None if miss
+        """
+        # Check cache existence
         self.lock.acquire(blocking=True)
         cached = self.cache.get(hs)
         self.lock.release()
+        
+        # Anti-thrashing: Force miss after 5 sequential hits
         if self.continues_hits > 5:
             cached = None
+            
         if cached is not None:
+            # Update hit tracking
             if self.last_hs != hs:
-                self.continues_hits += 1
+                self.continues_hits += 1  # Increment sequential counter
             else:
-                self.continues_hits = 0
+                self.continues_hits = 0  # Reset if same key
             self.last_hs = hs
             self.hits += 1
+            
+            # Promote to MRU position
             self.lock.acquire(blocking=True)
             self.cache.move_to_end(hs)
             self.lock.release()
-            res = turbojpeg.decompress(cached, fastdct = False, fastupsample=False, pixelformat=turbojpeg.BGRA)
-            decompressed_img =  np.ndarray((1024,512,4), dtype=np.uint8, buffer=res)
-            result_img = decompressed_img[:512,:,:]
-            result_img[:,:,3] = decompressed_img[512:,:,0]
+            
+            # Decompress and unpack RGBA data
+            res = turbojpeg.decompress(
+                cached, 
+                fastdct=False,  # High quality DCT
+                fastupsample=False,  # Quality upsampling
+                pixelformat=turbojpeg.BGRA
+            )
+            decompressed_img = np.ndarray((1024,512,4), dtype=np.uint8, buffer=res)
+            result_img = decompressed_img[:512,:,:]  # Extract RGB
+            result_img[:,:,3] = decompressed_img[512:,:,0]  # Restore alpha
             return result_img
         else:
+            # Update miss tracking
             self.miss += 1
             self.continues_hits = 0
             self.last_hs = hs
             return None
     def write(self, hs:int, data:np.ndarray):
-        self.queue.put_nowait((hs, data.copy()))
-
-
-if __name__ == '__main__':
-    import cv2
-    # Load test image
-    img = cv2.imread('./data/images/lambda_00.png', cv2.IMREAD_UNCHANGED)
-    cacher = Cacher()
-    cacher.write(0, img)
-    import time
-    time.sleep(0.5)
-    print(cacher.read(0) is None)
-    from tqdm import tqdm
-    for i in tqdm(range(10000)):
-        a = cacher.read(0)
+        """Queue data for caching.
+        
+        Args:
+            hs: Hash key for the data
+            data: Raw image data to cache (will be copied)
+        """
+        self.queue.put_nowait((hs, data.copy()))  # Copy to avoid mutation

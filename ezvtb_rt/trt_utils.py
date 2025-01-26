@@ -209,11 +209,3 @@ class Processor:
         self.stream.synchronize()
         
         return [np.copy(outp.host) for outp in self.outputs]
-    
-def get_trt_engine(model_dir:str, component:str):
-    trt_filename = join(model_dir, component+'.trt')
-    if os.path.isfile(trt_filename):
-        return load_engine(trt_filename)
-    else:
-        raise ValueError(f'TRT has not built for {trt_filename}, call check_build_all_models() first')
-
