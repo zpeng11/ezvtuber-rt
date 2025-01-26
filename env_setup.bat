@@ -1,3 +1,4 @@
+conda install -y nvidia/label/cuda-12.6.3::cuda-nvcc-dev_win-64
 conda install conda-forge::pycuda onnx onnxruntime-directml turbojpeg tqdm opencv-python
 python -m pip install --upgrade pip wheel
 python -m pip install nvidia-cudnn-cu12

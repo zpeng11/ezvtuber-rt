@@ -1,12 +1,14 @@
 # eztuber-rt
-> 不用3080，也不用80%占用，1660s大矿卡也能开着模型玩黑猴
+> 不用3080，也不用80%占用，3060也能开着模型玩黑猴
 > 
 > Inspired and motivated by [THA3](https://github.com/pkhungurn/talking-head-anime-3-demo), [EeasyVtuber](https://github.com/yuyuyzl/EasyVtuber) and [RIFE](https://github.com/hzwer/ECCV2022-RIFE). Rapid implementation powered by Nvidia [TensorRT](https://github.com/NVIDIA/TensorRT) inference framework. Output 4x super-resolution powered by [AnimeVideo-v3 model](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/anime_video_model.md) from [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), and 2x super-resolution powered by [UpConv7 model](https://github.com/nagadomi/nunif/releases/tag/0.0.0) from [waifu2x project](https://github.com/nagadomi/waifu2x)
-## Minimum Requeirement
-### System
-Windows only currently, *nix may work if you can figure out environment.
 
-仅Windows
+## Purpose
+The primary goal of this project is to provide ONNX models and integrated code for model usage for the [EasyVtuber](https://github.com/zpeng11/EasyVtuber) project. All functionalities are encapsulated within the Core module. Please refer to [interface](https://github.com/zpeng11/EasyVtuber/blob/main/ezvtb_rt_interface.py) to create an interface file for usage. Contributions and further development are welcome.
+
+本项目主旨在为 [EasyVtuber](https://github.com/zpeng11/EasyVtuber) 项目提供onnx模型和模型使用的代码整合，以`Core`核心包装所有功能实现，请参考 [此接口](https://github.com/zpeng11/EasyVtuber/blob/main/ezvtb_rt_interface.py) 创建接口文件使用。欢迎二次开发。
+
+## Minimum Requeirement
 ### Graphic Card
 Most modern discrete gaming level graphic card! AMD RX580 and up, Intel Arc a750 and up, Nvidia GTX1650 and up. (Minimum standard is meet by reaching 25fps debug output after interpolation)
 
@@ -34,9 +36,9 @@ Currently supporting AMD and Intel GPU by DirectML execution provider of OnnxRun
 A卡和I卡使用OnnxRuntime 提供的DirectML支持，可用但因为Python接口不完善有诸多限制，此实现并非本项目主要实现方向，仅提供入门支持，请自行斟酌。
 
 ### Cache
-Updated cache structure, provide VRAM+RAM+DiskDatabase solutions for caching results effectively lower down GPU resource comsumption. Use SIMD library TurboJPEG to save space.
+Updated cache structure, provide VRAM+RAM solutions for caching results effectively lower down GPU resource comsumption. Use SIMD library TurboJPEG to save space.
 
-实现显存，内存，和硬盘数据库等各式缓存方式供选择，有效减少gpu计算和显存占用。使用SIMD支持的TurboJPEG库实现快速图像压缩解压减少储存压力。
+实现显存，内存缓存器，有效减少gpu计算和显存占用。使用SIMD支持的TurboJPEG库实现快速图像压缩解压减少储存压力。
 
 
 ### RIFE
@@ -60,8 +62,6 @@ Please download and extract to `/data` folder for algorithm to run.
 [Click here for download!](https://github.com/zpeng11/ezvtuber-rt/releases/download/0.0.1/20241220.zip)
 
 ## TODO
-### Fix FP16 with Onnxruntime DirectML
-FP16 kernels has undetected bug on devices with FP16 support.
 
 ### INT8 Quantization and mobile deployment with NCNN.
 ## References
