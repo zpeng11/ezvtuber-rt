@@ -61,6 +61,10 @@ Please download and extract to `/data` folder for algorithm to run.
 
 [Click here for download!](https://github.com/zpeng11/ezvtuber-rt/releases/download/0.0.1/20241220.zip)
 
+## INT8 Quantization Research
+By using PTQ(Post training quantization) methods, I calibrated and quantized THA3 model with ONNX Runtime quantization and Nvidia Model Optimizer. I worked on seperable fp16 models, and found that combiner and decomposer are good with quantization into INT8 with negligible error. However these two models are not frequently called in inference stage and so does not accelerate our Ezvtb core. Among morpher, rotator, and editor, I found that INT8 quantization causes huge error probably becauses of attention machanism. The only exception is that editor could work with qdq quantize mode only on Conv Layers of downsampling and upsampling stages, which brings partial quantization to ~20 Conv layers and introduced visible decline in generation quality. By comparing performance on Nvidia Nsight Visual Profiler, I found that partial quantization of editor did not bring noticable acceleration to my RTX3060 GPU in overall execution. 
+
+Concludsion in brief: THA3 weights are not good for INT8 quantization in PTQ mothod, maybe try to do QAT method with using more dataset? 
 ## TODO
 
 ### INT8 Quantization and mobile deployment with NCNN.
