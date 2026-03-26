@@ -42,24 +42,33 @@ class HostDeviceMem(object):
 
 
 class TRTEngine:
-    def __init__(self, engine: trt.ICudaEngine | str, n_input:int):
-        if isinstance(engine, str):
-            engine = load_engine(engine)
-            assert engine is not None, f'Failed to load engine from path {engine}'
-        self.engine: trt.ICudaEngine = engine
+    def __init__(self, engine_path: str, n_input:int):
+        self.engine: trt.ICudaEngine = load_engine(engine_path)
+        assert self.engine is not None, f'Failed to load engine from path {engine_path}'
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Creating inference context')
+        self.engine_cache_path = engine_path + '.cache'
+        self.cached_flag = False
         # create execution context
-        runtime_config = engine.create_runtime_config()
-        runtime_config.cuda_graph_strategy = trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE
-        self.context: trt.IExecutionContext = engine.create_execution_context(runtime_config)
+        self.runtime_config = self.engine.create_runtime_config()
+        self.runtime_config.set_execution_context_allocation_strategy(trt.ExecutionContextAllocationStrategy.STATIC)
+        self.runtime_config.cuda_graph_strategy = trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE
+        self.runtime_cache = self.runtime_config.create_runtime_cache()
+        if os.path.exists(self.engine_cache_path):
+            with open(self.engine_cache_path, 'rb') as cache_file:
+                cache_data = cache_file.read()
+                self.runtime_cache.deserialize(cache_data)
+                TRT_LOGGER.log(TRT_LOGGER.INFO, f'Loaded runtime cache from {self.engine_cache_path}')
+                self.cached_flag = True
+        self.runtime_config.set_runtime_cache(self.runtime_cache)
+        self.context: trt.IExecutionContext = self.engine.create_execution_context(self.runtime_config)
         self.n_batch: int = -1
         self.in_out_tensors: dict = {}
         self.inputs: List[HostDeviceMem] = []
         self.outputs: List[HostDeviceMem] = []
         
         # get input and output tensor names
-        self.input_tensor_names: List[str] = [engine.get_tensor_name(i) for i in range(n_input)]
-        self.output_tensor_names: List[str] = [engine.get_tensor_name(i) for i in range(n_input, self.engine.num_io_tensors)]
+        self.input_tensor_names: List[str] = [self.engine.get_tensor_name(i) for i in range(n_input)]
+        self.output_tensor_names: List[str] = [self.engine.get_tensor_name(i) for i in range(n_input, self.engine.num_io_tensors)]
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Input nodes: '+ str(self.input_tensor_names))
         TRT_LOGGER.log(TRT_LOGGER.INFO, 'Output nodes: '+ str(self.output_tensor_names))
 
@@ -114,6 +123,15 @@ class TRTEngine:
         self.context.execute_async_v3(stream.handle)
         # Record the end event
         self.end_event.record(stream)
+
+        if not self.cached_flag:
+            # serialize the cache into a memory blob and save to disk
+            with open(self.engine_cache_path, 'wb') as runtime_cache_file:
+                with self.runtime_cache.serialize() as buffer:
+                    runtime_cache_file.write(buffer)
+            TRT_LOGGER.log(TRT_LOGGER.INFO, f'Saved runtime cache to {self.engine_cache_path}')
+            self.cached_flag = True
+
         # Synchronize the stream if requested
         if sync:
             stream.synchronize()

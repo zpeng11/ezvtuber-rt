@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import os
 import numpy as np
 import tensorrt_rtx as trt
@@ -92,12 +93,27 @@ def load_engine(path):
 
         # Generate cache filename from ONNX path (hash or based on filename)
         onnx_name = os.path.splitext(os.path.basename(path))[0]
-        engine_path = os.path.join(cache_dir, f'{onnx_name}.trt')
+        hash_suffix = hashlib.md5(path.encode('utf-8')).hexdigest()[:8]
+        engine_path = os.path.join(cache_dir, f'{onnx_name}_{hash_suffix}.trt')
 
-        TRT_LOGGER.log(TRT_LOGGER.INFO, f'Building engine from ONNX: {path}')
-        engine = build_engine(path)
-        save_engine(engine, engine_path)
-        path = engine_path  # Use cached engine
+        if os.path.exists(engine_path):
+            runtime = trt.Runtime(TRT_LOGGER)
+            try:
+                with open(engine_path, 'rb') as f:
+                    engine_buffer = f.read()
+                validity, diagnostics = runtime.get_engine_validity(engine_buffer)
+            except Exception as exc:
+                validity, diagnostics = trt.EngineValidity.INVALID, str(exc)
+
+            if validity == trt.EngineValidity.INVALID:
+                TRT_LOGGER.log(TRT_LOGGER.WARNING, f'Cached engine {engine_path} is invalid. Rebuilding... Diagnostics: {diagnostics}')
+                os.remove(engine_path)  # Remove invalid cache
+
+        if not os.path.exists(engine_path):
+            TRT_LOGGER.log(TRT_LOGGER.INFO, f'Building engine from ONNX: {path}')
+            engine = build_engine(path)
+            save_engine(engine, engine_path)
+        path = engine_path  # Use built trt engine path for loading
     TRT_LOGGER.log(TRT_LOGGER.WARNING, f'Loading engine from file {path}')
     runtime = trt.Runtime(TRT_LOGGER)
     with open(path, 'rb') as f:
