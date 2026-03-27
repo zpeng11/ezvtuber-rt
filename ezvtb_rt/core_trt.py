@@ -10,32 +10,7 @@ import os
 from typing import List
 import pyanime4k
 import cv2
-
-
-def _mark_interpolated_frames(frames: np.ndarray) -> None:
-    """插值帧打红点、原始帧打蓝点，仅当环境变量 EZVTB_MARK_INTERPOLATED=1 时生效。
-    支持 NHWC (N,H,W,4) 与 NCHW (N,4,H,W)，TRT 多为 NCHW，ORT 多为 NHWC。"""
-    if not os.environ.get('EZVTB_MARK_INTERPOLATED', '').strip() in ('1', 'true', 'True', 'yes'):
-        return
-    if len(frames.shape) != 4 or frames.shape[0] < 1:
-        return
-    if frames.dtype == np.uint8:
-        red_bgra = (0, 0, 255, 255)
-        blue_bgra = (255, 0, 0, 255)
-    else:
-        red_bgra = (0.0, 0.0, 1.0, 1.0)
-        blue_bgra = (1.0, 0.0, 0.0, 1.0)
-    n = frames.shape[0]
-    if frames.shape[1] == 4:
-        # NCHW (TensorRT 常见)，4x4 方块
-        for i in range(n - 1):
-            frames[i, :, 0:4, 0:4] = np.array(red_bgra, dtype=frames.dtype).reshape(4, 1, 1)
-        frames[n - 1, :, 0:4, 0:4] = np.array(blue_bgra, dtype=frames.dtype).reshape(4, 1, 1)
-    else:
-        # NHWC (ONNX 常见)，4x4 方块
-        for i in range(n - 1):
-            frames[i, 0:4, 0:4, :] = red_bgra
-        frames[n - 1, 0:4, 0:4, :] = blue_bgra
+from ezvtb_rt.frame_mark import mark_interpolated_frames
 
 
 def has_none_object_none_pattern(lst):
@@ -383,7 +358,7 @@ class CoreTRT:
             rife_mem_res = tha_mem_res
         
         if self.sr is None and self.sr_a4k is None:
-            _mark_interpolated_frames(rife_mem_res.host)
+            mark_interpolated_frames(rife_mem_res.host)
             return np.copy(rife_mem_res.host)
         
         if self.sr is not None:
@@ -418,7 +393,7 @@ class CoreTRT:
                     if self.sr_cacher is not None:
                         self.sr_cacher.put(hs, sr_img)
         result = np.stack(sr_results, axis=0)
-        _mark_interpolated_frames(result)
+        mark_interpolated_frames(result)
         return result
 
     def a4k_infer_bgra(self, img_bgra: np.ndarray) -> np.ndarray:
@@ -447,11 +422,11 @@ class CoreTRT:
                     self.sr.outputs[0].dtoh(self.main_stream)
                     self.main_stream.synchronize()
                     out = np.concatenate((self.sr.outputs[0].host, np.expand_dims(cached_sr, axis=0)), axis=0)
-                    _mark_interpolated_frames(out)
+                    mark_interpolated_frames(out)
                     return out
                 else: # there is only one frame to SR, which is cached
                     out = np.expand_dims(cached_sr, axis=0)
-                    _mark_interpolated_frames(out)
+                    mark_interpolated_frames(out)
                     return out
             else: # No SR cache hit, dealing with single pose with RIFE interpolation followed by SR, or SR for a single tha result
                 sr_batch = rife_mem_res.host.shape[0] if len(rife_mem_res.host.shape) == 4 else 1
@@ -463,7 +438,7 @@ class CoreTRT:
                 if self.sr_cacher is not None:
                     self.sr_cacher.put(hs, self.sr.outputs[0].host[-1])
                 out = np.copy(self.sr.outputs[0].host)
-                _mark_interpolated_frames(out)
+                mark_interpolated_frames(out)
                 return out
         else: # Multiple poses with RIFE followed by SR
             assert len(rife_mem_res.host.shape) == 4 and rife_mem_res.host.shape[0] == len(poses)
@@ -476,7 +451,7 @@ class CoreTRT:
                     to_sr_images.append(rife_mem_res.host[i])
             if all(x is not None for x in sr_results): # All SR cached
                 out = np.stack(sr_results, axis=0)
-                _mark_interpolated_frames(out)
+                mark_interpolated_frames(out)
                 return out
             else: # Some SR missing, run SR on missing ones
                 sr_batch = len(to_sr_images)
@@ -496,5 +471,5 @@ class CoreTRT:
                             self.sr_cacher.put(hash(str(poses[i])), sr_results[i])
                         sr_output_idx += 1
                 out = np.stack(sr_results, axis=0)
-                _mark_interpolated_frames(out)
+                mark_interpolated_frames(out)
                 return out     

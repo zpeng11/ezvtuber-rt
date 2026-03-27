@@ -51,7 +51,6 @@ class TRTEngine:
         # create execution context
         self.runtime_config = self.engine.create_runtime_config()
         self.runtime_config.set_execution_context_allocation_strategy(trt.ExecutionContextAllocationStrategy.STATIC)
-        self.runtime_config.cuda_graph_strategy = trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE
         self.runtime_cache = self.runtime_config.create_runtime_cache()
         if os.path.exists(self.engine_cache_path):
             with open(self.engine_cache_path, 'rb') as cache_file:
@@ -60,6 +59,7 @@ class TRTEngine:
                 TRT_LOGGER.log(TRT_LOGGER.INFO, f'Loaded runtime cache from {self.engine_cache_path}')
                 self.cached_flag = True
         self.runtime_config.set_runtime_cache(self.runtime_cache)
+        self.runtime_config.cuda_graph_strategy = trt.CudaGraphStrategy.WHOLE_GRAPH_CAPTURE
         self.context: trt.IExecutionContext = self.engine.create_execution_context(self.runtime_config)
         self.n_batch: int = -1
         self.in_out_tensors: dict = {}

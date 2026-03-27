@@ -9,33 +9,7 @@ from ezvtb_rt.tha4_student_ort import THA4StudentORTSessions
 import ezvtb_rt
 from ezvtb_rt.ort_utils import createORTSession
 import pyanime4k
-
-
-def _mark_interpolated_frames(frames: np.ndarray) -> None:
-    """插值帧打红点、原始帧打蓝点，仅当环境变量 EZVTB_MARK_INTERPOLATED=1 时生效。
-    支持 NHWC (N,H,W,4) 与 NCHW (N,4,H,W)，ORT 多为 NHWC。"""
-    if not os.environ.get('EZVTB_MARK_INTERPOLATED', '').strip() in ('1', 'true', 'True', 'yes'):
-        return
-    if len(frames.shape) != 4 or frames.shape[0] < 1:
-        return
-    if frames.dtype == np.uint8:
-        red_bgra = (0, 0, 255, 255)
-        blue_bgra = (255, 0, 0, 255)
-    else:
-        red_bgra = (0.0, 0.0, 1.0, 1.0)
-        blue_bgra = (1.0, 0.0, 0.0, 1.0)
-    n = frames.shape[0]
-    if frames.shape[1] == 4:
-        # NCHW，4x4 方块
-        for i in range(n - 1):
-            frames[i, :, 0:4, 0:4] = np.array(red_bgra, dtype=frames.dtype).reshape(4, 1, 1)
-        frames[n - 1, :, 0:4, 0:4] = np.array(blue_bgra, dtype=frames.dtype).reshape(4, 1, 1)
-    else:
-        # NHWC，4x4 方块
-        for i in range(n - 1):
-            frames[i, 0:4, 0:4, :] = red_bgra
-        frames[n - 1, 0:4, 0:4, :] = blue_bgra
-
+from ezvtb_rt.frame_mark import mark_interpolated_frames
 
 class CoreORT:
     def __init__(self,
@@ -228,7 +202,7 @@ class CoreORT:
             rife_result = np.expand_dims(tha_result, axis=0)
 
         if self.sr is None and self.sr_a4k is None:  # Only RIFE
-            _mark_interpolated_frames(rife_result)
+            mark_interpolated_frames(rife_result)
             return rife_result
 
         sr_process_func = self.sr_a4k_process if self.sr_a4k is not None else self.sr_onnx_process
@@ -283,7 +257,7 @@ class CoreORT:
                             self.sr_cacher.put(hs, sr_outputs[sr_idx])
                             sr_idx += 1
                     sr_result = np.stack(sr_result, axis=0)
-        _mark_interpolated_frames(sr_result)
+        mark_interpolated_frames(sr_result)
         return sr_result
 
     def sr_onnx_process(self, frames: np.ndarray) -> np.ndarray:

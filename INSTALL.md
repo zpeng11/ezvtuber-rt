@@ -3,12 +3,12 @@
 This guide explains how to install `ezvtuber-rt` as a Python library. You need to install Anaconda beforehead and prepare a Python3.10 Environment
 
 ## Download TensorRT-RTX
+1. Go to https://developer.nvidia.com/tensorrt-rtx download for windows cuda129
+2. Unzip downloaded folder
+3. Add bin folder to environment PATH
+4. Activate your python environment and install like below:
 ```bash
-curl -L -o trt_rtx.zip https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/TensorRT-RTX-1.3.0.35-win10-amd64-cuda-12.9-Release-external.zip
-tar -xf trt_rtx.zip "TensorRT-RTX-1.3.0.35" && ren "TensorRT-RTX-1.3.0.35" "TensorRT-RTX-1.3.0.35_cu129"
-# Adding the bin folder to PATH
-cd TensorRT-RTX-1.3.0.35_cu129\bin && set PATH=%CD%;%PATH%
-pip install TensorRT-RTX-1.3.0.35_cu129\python\tensorrt_rtx-1.3.0.35-cp310-none-win_amd64.whl
+pip install D:\TensorRT-RTX-1.4.0.76_cu129\python\tensorrt_rtx-1.4.0.76-cp310-none-win_amd64.whl
 ```
 
 ## Installation Methods
